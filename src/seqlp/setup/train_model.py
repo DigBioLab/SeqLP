@@ -1,8 +1,8 @@
 from transformers import Trainer, TrainingArguments
-from .setup.setup_model import SetupModel
+from .setup_model import SetupModel
 import os
 from transformers import BertTokenizer
-from .setup.data_prep import Prepare
+from . import Prepare
 import gzip
 import shutil
 import pandas as pd
@@ -30,7 +30,8 @@ class TrainModel:
     "weight_decay": 0.01,
     "no_cuda": True
     }
-    def __init__(self, download_commands_script, model_config = heavy_config,train_params = params, limit_files = 10 ) -> None:
+    def __init__(self, download_commands_script, model_config = heavy_config,train_params = params, limit_files = 10, user_dir = None) -> None:
+        self.user_dir = user_dir
         gz_filename = self.download_and_prepare(download_commands_script, limit = limit_files)
         if os.path.isfile(gz_filename):
             self.train_encodings, self.val_encodings = self.tokenize(gz_filename)
@@ -41,8 +42,11 @@ class TrainModel:
             print("File not found. Please check the path to the file.")
     
     @staticmethod
-    def setup_dirs():
-        dir = os.getcwd()
+    def setup_dirs(user_dir):
+        if user_dir == None:
+            dir = os.getcwd()
+        else:
+            dir = user_dir
         result_dir = os.path.join(dir, "results")
         if os.path.isdir(result_dir):
             pass
@@ -91,7 +95,7 @@ class TrainModel:
 
     
     def add_dirs_to_train_args(self, params):
-        result_dir, log_dir = self.setup_dirs()
+        result_dir, log_dir = self.setup_dirs(self.user_dir)
         params["logging_dir"] = log_dir
         params["output_dir"] = result_dir
         return params

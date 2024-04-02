@@ -32,7 +32,7 @@ class TrainModel:
     }
     def __init__(self, download_commands_script, model_config = heavy_config,train_params = params, limit_files = 10, user_dir = None) -> None:
         self.user_dir = user_dir
-        gz_filename = self.download_and_prepare(download_commands_script, limit = limit_files)
+        gz_filename = self.download_and_prepare(download_commands_script, limit = limit_files, user_dir=user_dir)
         if os.path.isfile(gz_filename):
             self.train_encodings, self.val_encodings = self.tokenize(gz_filename)
             self.model = self.model_setup(heavy_config = model_config)
@@ -60,8 +60,8 @@ class TrainModel:
         return result_dir, log_dir
 
     @staticmethod
-    def download_and_prepare(download_commands_script:str, limit = 1000000, save_single_csvs = False) -> str:            
-        Prep = Prepare(download_commands_script)
+    def download_and_prepare(download_commands_script:str, limit = 1000000, save_single_csvs = False, user_dir = False) -> str:            
+        Prep = Prepare(download_commands_script, user_dir)
         concatenated_df = Prep.download_data(limit = limit, save_single_csvs = save_single_csvs)
         concatenated_df = Prep.create_uniform_series(concatenated_df)
         concatenated_df = Prep.drop_duplicates(concatenated_df)

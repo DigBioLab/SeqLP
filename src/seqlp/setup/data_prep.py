@@ -68,8 +68,12 @@ class ReadCSV:
    def concatenate(self, aa_alignment_sequence:pd.DataFrame):
       self.concatenated_df = pd.concat([self.concatenated_df, aa_alignment_sequence])
       
-   def process_csv(self, filename, save_csvs = True):
-      aa_alignment_sequence = self.unzip_and_read_csv(filename)
+   def process_csv(self, filename, aa_alignment_sequence = None, save_csvs = False):
+      if aa_alignment_sequence is not None:
+         pass
+      else:
+         aa_alignment_sequence = self.unzip_and_read_csv(filename)
+         
       self.csv_filename = filename.split(".")[0] + ".csv"
       aa_alignment_sequence.to_csv(self.csv_filename, columns = self.cols_of_interest, index = False)
       self.concatenate(aa_alignment_sequence)
@@ -79,6 +83,7 @@ class ReadCSV:
          with open(self.csv_filename, 'rb') as f_in:
             with gzip.open(self.csv_filename + '.gz', 'wb') as f_out:
                   shutil.copyfileobj(f_in, f_out)
+      else:
          os.remove(self.csv_filename)
       return aa_alignment_sequence
       
@@ -119,7 +124,7 @@ class Prepare:
                   response.raise_for_status()
                   # Write the content of the response to a file
                   with open(save_name, 'wb') as out_file:
-                        out_file.write(response.content)
+                     out_file.write(response.content)
                   aa_alignment_sequence = self.CSVSaver.process_csv(save_name, save_csvs = save_single_csvs)
                   self.CSVSaver.concatenate(aa_alignment_sequence)
                   os.remove(save_name)
@@ -163,7 +168,7 @@ class Prepare:
 
       return pd.Series(sequences, name='sequences')
    
-   def create_uniform_series_with_random_length(self, concatenated_df: pd.DataFrame) -> pd.Series:
+   def create_uniform_series_with_random_length(self, concatenated_df: pd.DataFrame, minimum_length = 10) -> pd.Series:
       """This function just takes a random part of the full sequence if it is longer than 5, otherwise it takes the full sequence.
 
       Args:
@@ -173,19 +178,30 @@ class Prepare:
           pd.Series: one column with different sequence length from heavy chain.
       """
       sequences = []
+      max_length = concatenated_df['sequence_alignment_aa'].str.len().max()
+      all_lengths = list(range(minimum_length, max_length + 1))
+      np.random.shuffle(all_lengths)
+      length_index = 0
       for _, row in concatenated_df.iterrows():
-         # get the full sequence
          full_sequence = row['sequence_alignment_aa']
-         # if the sequence is longer than 5, take a random part of it
          if len(full_sequence) > 5:
-            start = random.randint(0, len(full_sequence) - 5)
-            end = random.randint(start + 5, len(full_sequence))
-            sequence = full_sequence[start:end]
+               while all_lengths[length_index] > len(full_sequence):
+                  length_index += 1
+                  if length_index >= len(all_lengths):
+                     np.random.shuffle(all_lengths)
+                     length_index = 0
+               length = all_lengths[length_index]
+               length_index += 1
+               if length_index >= len(all_lengths):
+                  np.random.shuffle(all_lengths)
+                  length_index = 0
+               start = np.random.randint(0, len(full_sequence) - length + 1)  # generate a random start point
+               sequence = full_sequence[start:start+length]
          else:
-            sequence = full_sequence
+               sequence = full_sequence
          sequences.append(sequence)
       return pd.Series(sequences, name='sequences')
-
+      
    @staticmethod
    def drop_duplicates(concatenated_series:pd.Series) -> pd.Series:
       return concatenated_series.dropna().drop_duplicates()

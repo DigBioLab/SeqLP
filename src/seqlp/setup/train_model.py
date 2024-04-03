@@ -40,8 +40,8 @@ class TrainModel:
     "no_cuda": True
     }
     
-    def __init__(self, train_dataset, validation_dataset, model_config = heavy_config,train_params = params, ):
-        self.model = self.model_setup(heavy_config = model_config)
+    def __init__(self, train_dataset, validation_dataset, model_config = heavy_config,train_params = params, model_type = None):
+        self.model = self.model_setup(heavy_config = model_config, model_type=model_type)
         self.train_params = self.train_args(train_params)
         self.trainer = self.setup_trainer(train_dataset, validation_dataset)
         
@@ -64,8 +64,8 @@ class TrainModel:
         return result_dir, log_dir
     
     @staticmethod
-    def model_setup(heavy_config:dict):
-        model = SetupModel(heavy_config).model
+    def model_setup(heavy_config:dict, model_type:str):
+        model = SetupModel(heavy_config, model_type).model
         return model
 
     

@@ -166,3 +166,7 @@ train_data
 .vscode
 .venv
 __pycache__
+
+*=*
+testing_model_server
+server_venv

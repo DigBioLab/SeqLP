@@ -1,11 +1,20 @@
 from transformers import Trainer, TrainingArguments
 from .setup_model import SetupModel
 import os
-from transformers import BertTokenizer
-from . import Prepare
-import gzip
-import shutil
-import pandas as pd
+
+from torch.utils.data import Dataset
+
+class AminoAcidDataset(Dataset):
+    def __init__(self, encodings):
+        self.encodings = encodings
+
+    def __len__(self):
+        return len(self.encodings.input_ids)
+
+    def __getitem__(self, idx):
+        return {key: val[idx] for key, val in self.encodings.items()}
+
+
 
 class TrainModel:
     heavy_config = {
@@ -13,7 +22,7 @@ class TrainModel:
         "num_attention_heads": 12,
         "hidden_size": 768,
         "d_ff": 3072,
-        "vocab_size": 25,
+        "vocab_size": 33,
         "max_len": 150,
         "max_position_embeddings": 152,
         "batch_size": 96,
@@ -30,17 +39,12 @@ class TrainModel:
     "weight_decay": 0.01,
     "no_cuda": True
     }
-    def __init__(self, download_commands_script, model_config = heavy_config,train_params = params, limit_files = 10, user_dir = None) -> None:
-        self.user_dir = user_dir
-        gz_filename = self.download_and_prepare(download_commands_script, limit = limit_files, user_dir=user_dir)
-        if os.path.isfile(gz_filename):
-            self.train_encodings, self.val_encodings = self.tokenize(gz_filename)
-            self.model = self.model_setup(heavy_config = model_config)
-            self.train_params = self.train_args(train_params)
-            self.trainer = self.setup_trainer()
-        else:
-            print("File not found. Please check the path to the file.")
     
+    def __init__(self, train_dataset, validation_dataset, model_config = heavy_config,train_params = params, ):
+        self.model = self.model_setup(heavy_config = model_config)
+        self.train_params = self.train_args(train_params)
+        self.trainer = self.setup_trainer(train_dataset, validation_dataset)
+        
     @staticmethod
     def setup_dirs(user_dir):
         if user_dir == None:
@@ -58,36 +62,7 @@ class TrainModel:
         else:
             os.mkdir(log_dir)
         return result_dir, log_dir
-
-    @staticmethod
-    def download_and_prepare(download_commands_script:str, limit = 1000000, save_single_csvs = False, user_dir = False) -> str:            
-        Prep = Prepare(download_commands_script, user_dir)
-        concatenated_df = Prep.download_data(limit = limit, save_single_csvs = save_single_csvs)
-        concatenated_df = Prep.create_uniform_series(concatenated_df)
-        concatenated_df = Prep.drop_duplicates(concatenated_df)
-        filename = os.path.join(Prep.save_dir, "concatenated.csv")
-        concatenated_df.to_csv(filename, index = False)
-        with open(filename, 'rb') as f_in:
-            with gzip.open(filename + '.gz', 'wb') as f_out:
-                  shutil.copyfileobj(f_in, f_out)
-        os.remove(filename)
-        return filename + '.gz'
     
-    @staticmethod
-    def read_gzipped_csv(filename):
-        with gzip.open(filename, 'rt') as f:
-            df = pd.read_csv(f)
-        return df
-    
-    def tokenize(self, gz_filename:str):
-        concatenated_df = self.read_gzipped_csv(gz_filename)
-        train_sequences, val_sequences = Prepare.create_train_test(concatenated_df)
-        tokenizer = BertTokenizer.from_pretrained("Rostlab/prot_bert", do_lower_case = False)
-        train_encodings = tokenizer(list(train_sequences),truncation = True, max_length = 150, return_tensors="pt")
-        val_encodings = tokenizer(list(val_sequences),truncation = True, max_length = 150, return_tensors="pt")
-        
-        return train_encodings, val_encodings
-
     @staticmethod
     def model_setup(heavy_config:dict):
         model = SetupModel(heavy_config).model
@@ -105,17 +80,20 @@ class TrainModel:
         params = self.add_dirs_to_train_args(params)
         return TrainingArguments(**params)
         
-    def setup_trainer(self, ):
+    def setup_trainer(self, train_encodings, val_encodings, data_collator):
+        train_dataset = AminoAcidDataset(train_encodings)
+        val_dataset = AminoAcidDataset(val_encodings)
         trainer = Trainer(
             model=self.model,                         # the instantiated 🤗 Transformers model to be trained
             args=self.train_params,                  # training arguments, defined above
-            train_dataset=self.train_encodings,         # training dataset
-            eval_dataset=self.val_encodings            # evaluation dataset
+            train_dataset=train_dataset,         # training dataset
+            eval_dataset=val_dataset,
+            data_collator=data_collator
+            # evaluation dataset
         )
         return trainer
 
     def train(self):
         self.trainer.train()
-
-
-
+        
+        

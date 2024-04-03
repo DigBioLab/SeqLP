@@ -54,7 +54,7 @@ class ReadCSV:
    
    
    def __init__(self) -> None:
-      self.cols_of_interest = ["sequence_alignment_aa", "fwr1_aa", "fwr2_aa", "fwr3_aa", "fwr4_aa", "cdr1_aa", "cdr2_aa", "cdr3_aa"]
+      self.cols_of_interest = ["fwr1_aa", "cdr1_aa", "fwr2_aa","cdr2_aa",  "fwr3_aa", "cdr3_aa", "fwr4_aa", "sequence_alignment_aa"]
       self.concatenated_df = pd.DataFrame(columns = self.cols_of_interest)
       self.csv_filename = ""
    
@@ -104,7 +104,7 @@ class Prepare:
    def download_data(self, limit = 10, save_single_csvs = False) -> pd.DataFrame:
       """Downloads the data in the file with the wget commands and filters the columns in the csvs and saves them again as gzipped csvs in self.save_dir.
       """
-      sh_scripts = glob.glob(self.path_to_scripts + "\*")
+      sh_scripts = glob.glob(self.path_to_scripts + "/*.sh")
       assert len(sh_scripts) > 0, "No files found in the directory"
       n = 0
       for sh_script in sh_scripts:
@@ -128,7 +128,15 @@ class Prepare:
                   break
       return self.CSVSaver.concatenated_df
 
-   def create_uniform_series(self, concatenated_df: pd.DataFrame) -> pd.Series:
+   def create_uniform_series_chain_specific(self, concatenated_df: pd.DataFrame) -> pd.Series:
+      """This function takes a subset of columns (regions) and merges the sequential parts together so that in the final series are sequences of different length from the heavy chain.
+
+      Args:
+          concatenated_df (pd.DataFrame): contains the regions and full sequence in a dataframe
+
+      Returns:
+          pd.Series: one column with different sequence length from heavy chain.
+      """
       cols_of_interest = self.CSVSaver.cols_of_interest
       full_sequence_col = "sequence_alignment_aa"
 
@@ -139,7 +147,7 @@ class Prepare:
          combinations.extend(itertools.combinations(fragment_cols, r))
 
       # filter out non-sequential combinations
-      combinations = [c for c in combinations if all((c[i+1] in fragment_cols[fragment_cols.index(c[i])+1:]) for i in range(len(c)-1))]
+      combinations = [c for c in combinations if all((c[i+1] == fragment_cols[fragment_cols.index(c[i])+1]) for i in range(len(c)-1))]
 
       # add the full sequence as a standalone option
       combinations.append((full_sequence_col,))
@@ -148,10 +156,34 @@ class Prepare:
       for _, row in concatenated_df.iterrows():
          # randomly select one combination
          combination = random.choice(combinations)
+         valid_combination = [col for col in combination if pd.notna(row[col])] # removes columns if it has nan
          # concatenate the corresponding columns
-         sequence = ''.join(row[col] for col in combination)
+         sequence = ''.join(row[col] for col in valid_combination)
          sequences.append(sequence)
 
+      return pd.Series(sequences, name='sequences')
+   
+   def create_uniform_series_with_random_length(self, concatenated_df: pd.DataFrame) -> pd.Series:
+      """This function just takes a random part of the full sequence if it is longer than 5, otherwise it takes the full sequence.
+
+      Args:
+          concatenated_df (pd.DataFrame): contains the regions and full sequence in a dataframe
+
+      Returns:
+          pd.Series: one column with different sequence length from heavy chain.
+      """
+      sequences = []
+      for _, row in concatenated_df.iterrows():
+         # get the full sequence
+         full_sequence = row['sequence_alignment_aa']
+         # if the sequence is longer than 5, take a random part of it
+         if len(full_sequence) > 5:
+            start = random.randint(0, len(full_sequence) - 5)
+            end = random.randint(start + 5, len(full_sequence))
+            sequence = full_sequence[start:end]
+         else:
+            sequence = full_sequence
+         sequences.append(sequence)
       return pd.Series(sequences, name='sequences')
 
    @staticmethod
@@ -163,4 +195,24 @@ class Prepare:
       train_sequences, val_sequences = train_test_split(sequences, test_size=0.2, random_state=42)
       return train_sequences, val_sequences
 
+   @staticmethod
+   def insert_space(concatenated_df:pd.DataFrame) -> pd.DataFrame:
+      """Inserts a space between the amino acids.
 
+      Args:
+         concatenated_df (pd.DataFrame): _description_
+
+      Returns:
+         pd.DataFrame: _description_
+      """
+      concatenated_df = concatenated_df.dropna()
+      assert 'sequences' in concatenated_df.columns, "columns are: " + concatenated_df.columns + " and not 'sequences'"
+      seqs = concatenated_df["sequences"].tolist()
+      concatenated_df['sequences'] = concatenated_df['sequences'].apply(lambda x: ' '.join(list(x)) if isinstance(x, str) else x)
+      return concatenated_df
+
+   @staticmethod
+   def read_gzipped_csv(filename):
+      with gzip.open(filename, 'rt') as f:
+         df = pd.read_csv(f)
+      return df

@@ -15,15 +15,15 @@
 ### -- set the email address --
 
 
-#BSUB -u jobs.nilshof@outlook.de
+#BSUB -u jobs.nils@outlook.com
 ### -- send notification at start --
 #BSUB -B
 ### -- send notification at completion--
 #BSUB -N
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
-#BSUB -o job_output/initial_run-6.out
-#BSUB -e job_error/initial_run.err
+#BSUB -o /zhome/20/8/175218/job_output/initial_run.out
+#BSUB -e /zhome/20/8/175218/job_error/initial_run.err
 # -- end of LSF options --
 
 
@@ -45,9 +45,10 @@
 
 
 ####INPUTS#####
+run_name="init_train"
 store_dir="/zhome/20/8/175218/NLP_train/serious_train"
 command_script_dir="/zhome/20/8/175218/NLP_train"
-max_sequence_num=10000000
+max_sequence_num=100000000
 save_single_csv=False
 extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config.json"
 extra_train_config="/zhome/20/8/175218/NLP_train/serious_train/train_config.json"
@@ -56,7 +57,7 @@ model_type="distilBert"
 
 ###############
 
-package_path=$(dirname "$0")
-script_filename="${package_path}/src/seqlp/__main__.py"
 
-python3  $script_filename --command_script_dir $command_script_dir --store_dir $store_dir --max_file_num $max_file_num --save_single_csv $save_single_csv --extra_model_config $extra_model_config --extra_train_config $extra_train_config --use_existing_data $use_existing_data --model_type $model_type
+script_filename="/zhome/20/8/175218/SeqLP/src/seqlp/__main__.py"
+
+python3  $script_filename --command_script_dir $command_script_dir --run_name $run_name --store_dir $store_dir --max_sequence_num $max_sequence_num --save_single_csv $save_single_csv --extra_model_config $extra_model_config --extra_train_config $extra_train_config --use_existing_data $use_existing_data --model_type $model_type

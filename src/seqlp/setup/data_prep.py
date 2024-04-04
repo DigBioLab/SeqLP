@@ -78,16 +78,8 @@ class ReadCSV:
          aa_alignment_sequence = self.unzip_and_read_csv(filename)
          
       self.csv_filename = filename.split(".")[0] + ".csv"
-      aa_alignment_sequence.to_csv(self.csv_filename, columns = self.cols_of_interest, index = False)
       self.concatenate(aa_alignment_sequence)
 
-      if save_csvs:
-            # Compress the CSV file
-         with open(self.csv_filename, 'rb') as f_in:
-            with gzip.open(self.csv_filename + '.gz', 'wb') as f_out:
-                  shutil.copyfileobj(f_in, f_out)
-      else:
-         os.remove(self.csv_filename)
       return aa_alignment_sequence
       
 
@@ -129,7 +121,7 @@ class Prepare:
                      out_file.write(response.content)
                   aa_alignment_sequence = self.CSVSaver.process_csv(save_name, save_csvs = save_single_csvs)
                   self.CSVSaver.concatenate(aa_alignment_sequence)
-                  os.remove(save_name)
+                  #os.remove(self.CSVSaver.csv_filename)
 
                if self.CSVSaver.get_sequence_num() > limit:
                   break

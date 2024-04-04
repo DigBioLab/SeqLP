@@ -6,12 +6,13 @@ from setup.train_model import TrainModel
 from setup.tokenizer import TokenizeData
 import argparse
 import os
-
+from output.create_output import GenerateOutput
 
 if __name__ == "__main__":
     ####ARGS####
     parser = argparse.ArgumentParser()
     parser.add_argument("--command_script_dir", type=str, required = True, help = "Path to the directory containing the shell scripts to download the data")
+    parser.add_argument("--run_name", type =str, required = True)
     parser.add_argument("--store_dir", type=str, default=None)
     parser.add_argument("--max_sequence_num", type=int, default=1000000, help = "Maximum number of Sequences to include in training")
     parser.add_argument("--save_single_csv", type=bool, default=False, help = "Save the single csvs")
@@ -25,18 +26,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
     store_dir = args.store_dir
     command_script_dir = args.command_script_dir
-    max_file_num = args.max_sequence_num
+    max_seq_num = args.max_sequence_num
     save_single_csv = args.save_single_csv
     extra_model_config = args.extra_model_config
     extra_train_config = args.extra_train_config
-    ####END ARGS####
+    run_name = args.run_name
     
+    ####END ARGS####
+    Output = GenerateOutput(store_dir, run_name)
     tokenize = TokenizeData()
     if args.use_existing_data and store_dir is not None and not os.path.isfile(args.use_existing_data):
         if args.use_existing_data:
             print("You must provide the path to store_dir if you want to use existing data! Continue to download data.")
         filename = tokenize.download_and_prepare(download_commands_script=command_script_dir,
-                                                limit = max_file_num,
+                                                limit = max_seq_num,
                                                 save_single_csvs = save_single_csv,
                                                 user_dir = store_dir,
                                                 prep_data_type="uniform")
@@ -78,3 +81,14 @@ if __name__ == "__main__":
                         model_type=args.model_type,
                         user_dir=store_dir)
     Train.train()
+    num_parameters = Train.model.num_parameters()
+    print(Output.table_config(config_model, "model"))
+    print(Output.table_config(config_train, "train"))
+    time_dif = Output.time_dif()
+    print(Output.collect_general_info(max_seq_num,
+                                      time_dif,
+                                      num_parameters,
+                                      args.command,
+                                      args.model_type))
+    Train.trainer.save_model(os.path.join(store_dir, "model"))
+    print("Execution successful")

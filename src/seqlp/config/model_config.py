@@ -1,20 +1,36 @@
-from ..setup.tokenizer import TokenizeData
+from setup.tokenizer import TokenizeData
+import json
+import os
+import argparse
+from setup.setup_model import SetupModel
 
-def get_config(tokenize:TokenizeData, **kwargs:dict) ->dict:
-    config = {
-        "num_hidden_layers": 3,
-        "num_attention_heads": 3,
-        "hidden_size": 768,
-        "d_ff": 3072,
-        "vocab_size": len(tokenize.tokenizer), # important for input layer
-        "max_len": 150,
-        "max_position_embeddings": 152,
-        "batch_size": 96,
-        "max_steps": 225000,
-        "weight_decay": 0.01,
-        "peak_learning_rate": 0.0001,
-        }
-    for key, value in kwargs.items():
-        if key in config:
-            config[key] = value
-    return config
+class SetupModelConfig:
+        
+    def __init__(self) -> dict:
+        dir = os.path.dirname(__file__)
+        self.config = self.read_json(os.path.join(dir, "default_config_model.json"))
+        
+    def read_json(self, filepath):
+        self.check_filepath(filepath)
+        with open(filepath, 'r') as json_file:
+            data = json.load(json_file)
+        return data
+    
+    @staticmethod
+    def check_filepath(filepath):
+        assert os.path.isfile(filepath), "Please provide the correct filepath to the model config file."
+    
+    def set_tokenize_vocab(self, tokenize:TokenizeData):
+        self.config["vocab_size"] = len(tokenize.tokenizer)
+    
+    def set_max_len(self, max_len:int):
+        self.config["max_length"] = max_len
+    
+    def get_config(self, tokenize:TokenizeData, **kwargs:dict) -> dict:
+        self.set_tokenize_vocab(tokenize)
+        for key, value in kwargs.items():
+            self.config[key] = value
+
+        return self.config
+    
+    

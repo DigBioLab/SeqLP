@@ -2,7 +2,6 @@ import gzip
 import shutil
 import pandas as pd
 from .data_prep import Prepare
-import torch
 from transformers import DataCollatorForLanguageModeling
 from transformers import AutoTokenizer
 import os
@@ -31,27 +30,27 @@ class TokenizeData:
         return filename + '.gz'
     
     
-    def tokenize(self, gz_filename:str):
+    def tokenize(self, gz_filename:str, max_length = 150, mlm_probability = 0.15):
         concatenated_df:pd.DataFrame = Prepare.read_gzipped_csv(gz_filename)
         concatenated_df = Prepare.insert_space(concatenated_df)
         train_sequences, val_sequences = Prepare.create_train_test(concatenated_df)
         
         model_checkpoint = "facebook/esm2_t6_8M_UR50D"
         self.tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-        train_encodings = self.tokenizer(train_sequences["sequences"].tolist(), truncation=True, padding='max_length', max_length=150, return_tensors="pt")
+        train_encodings = self.tokenizer(train_sequences["sequences"].tolist(), truncation=True, padding='max_length', max_length=max_length, return_tensors="pt")
 
-        val_encodings = self.tokenizer(val_sequences["sequences"].tolist(), truncation=True, padding='max_length', max_length=150, return_tensors="pt")
+        val_encodings = self.tokenizer(val_sequences["sequences"].tolist(), truncation=True, padding='max_length', max_length=max_length, return_tensors="pt")
 
-        self.data_collator = self.masking(self.tokenizer)
+        self.data_collator = self.masking(self.tokenizer, mlm_probability)
      #   val_labels = val_sequences["labels"].tolist()
         return train_encodings, val_encodings,
     
     @staticmethod
-    def masking(tokenizer):
+    def masking(tokenizer, mlm_probability):
         data_collator = DataCollatorForLanguageModeling(
             tokenizer=tokenizer,
             mlm=True,  # Set to True for masked language modeling
-            mlm_probability=0.15  # Probability of masking a token
+            mlm_probability=mlm_probability  # Probability of masking a token
         )
         return data_collator
 

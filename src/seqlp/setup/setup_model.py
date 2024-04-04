@@ -1,4 +1,4 @@
-from transformers import DistilBertModel, DistilBertConfig
+from transformers import DistilBertForMaskedLM, DistilBertConfig
 
 class SetupModel:
 
@@ -9,7 +9,7 @@ class SetupModel:
     @staticmethod
     def distilBert(config):
         config = DistilBertConfig.from_dict(config)
-        model = DistilBertModel(config)
+        model = DistilBertForMaskedLM(config)
         return model, config
 
 

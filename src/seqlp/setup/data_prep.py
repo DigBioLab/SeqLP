@@ -64,6 +64,9 @@ class ReadCSV:
             aa_alignment_sequence = pd.read_csv(f, usecols = self.cols_of_interest, skiprows = 1)
       return aa_alignment_sequence
    
+   def get_sequence_num(self):
+      return self.concatenated_df.shape[0]
+   
    
    def concatenate(self, aa_alignment_sequence:pd.DataFrame):
       self.concatenated_df = pd.concat([self.concatenated_df, aa_alignment_sequence])
@@ -111,7 +114,6 @@ class Prepare:
       """
       sh_scripts = glob.glob(self.path_to_scripts + "/*.sh")
       assert len(sh_scripts) > 0, "No files found in the directory"
-      n = 0
       for sh_script in sh_scripts:
          with open(sh_script, "r") as f:
             for line in f:
@@ -128,8 +130,8 @@ class Prepare:
                   aa_alignment_sequence = self.CSVSaver.process_csv(save_name, save_csvs = save_single_csvs)
                   self.CSVSaver.concatenate(aa_alignment_sequence)
                   os.remove(save_name)
-               n += 1
-               if n == limit:
+
+               if self.CSVSaver.get_sequence_num() > limit:
                   break
       return self.CSVSaver.concatenated_df
 

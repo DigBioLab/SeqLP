@@ -1,7 +1,8 @@
 from transformers import Trainer, TrainingArguments
-from .setup_model import SetupModel
+from setup.setup_model import SetupModel
 import os
-
+from config.model_config import SetupModelConfig
+from config.train_config import SetupTrainConfig
 from torch.utils.data import Dataset
 
 class AminoAcidDataset(Dataset):
@@ -17,33 +18,16 @@ class AminoAcidDataset(Dataset):
 
 
 class TrainModel:
-    heavy_config = {
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "hidden_size": 768,
-        "d_ff": 3072,
-        "vocab_size": 33,
-        "max_len": 150,
-        "max_position_embeddings": 152,
-        "batch_size": 96,
-        "max_steps": 225000,
-        "weight_decay": 0.01,
-        "peak_learning_rate": 0.0001,
-        }
-
-    params = {
-    "num_train_epochs": 5,
-    "per_device_train_batch_size": 16,
-    "per_device_eval_batch_size": 64,
-    "warmup_steps": 500,
-    "weight_decay": 0.01,
-    "no_cuda": True
-    }
     
-    def __init__(self, train_dataset, validation_dataset, model_config = heavy_config,train_params = params, model_type = None):
+    heavy_config = SetupModelConfig().config
+
+    params = SetupTrainConfig().config
+
+    def __init__(self, train_dataset, validation_dataset, data_collator, model_config = heavy_config,train_params = params, model_type = "distilBert", user_dir = None):
+        self.user_dir = user_dir
         self.model = self.model_setup(heavy_config = model_config, model_type=model_type)
         self.train_params = self.train_args(train_params)
-        self.trainer = self.setup_trainer(train_dataset, validation_dataset)
+        self.trainer = self.setup_trainer(train_dataset, validation_dataset, data_collator)
         
     @staticmethod
     def setup_dirs(user_dir):
@@ -83,6 +67,7 @@ class TrainModel:
     def setup_trainer(self, train_encodings, val_encodings, data_collator):
         train_dataset = AminoAcidDataset(train_encodings)
         val_dataset = AminoAcidDataset(val_encodings)
+        print(train_dataset)
         trainer = Trainer(
             model=self.model,                         # the instantiated 🤗 Transformers model to be trained
             args=self.train_params,                  # training arguments, defined above

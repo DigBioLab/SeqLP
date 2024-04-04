@@ -3,8 +3,8 @@ from setup.tokenizer import TokenizeData
 
 
 ####INPUTS#####
-store_dir = "/zhome/20/8/175218/SeqLP/testing_model_server/test_launch"
-command_script_dir = "/zhome/20/8/175218/SeqLP/testing_model_server/"
+store_dir = "/zhome/20/8/175218/NLP_train/test_launch"
+command_script_dir = "/zhome/20/8/175218/NLP_train/"
 ###############
 tokenize = TokenizeData()
 
@@ -38,6 +38,7 @@ params = {
 }
 Train = TrainModel(train_encodings,
                      val_encodings,
+                     tokenize.data_collator,
                    model_config=heavy_config,
                    train_params=params,
                    user_dir=store_dir)

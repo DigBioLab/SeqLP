@@ -34,7 +34,11 @@ if __name__ == "__main__":
     
     ####END ARGS####
     Output = GenerateOutput(store_dir, run_name)
+
+
+
     tokenize = TokenizeData()
+    print("Init Tokenizing")
     if args.use_existing_data and store_dir is not None and not os.path.isfile(args.use_existing_data):
         if args.use_existing_data:
             print("You must provide the path to store_dir if you want to use existing data! Continue to download data.")
@@ -50,6 +54,9 @@ if __name__ == "__main__":
             filename = os.path.join(store_dir,"train_data", "concatenated.csv.gz")
             
     train_encodings, val_encodings = tokenize.tokenize(filename, max_length=args.max_length, mlm_probability=args.mlm_probability)
+    print("Data Collection and Tokenizing successful")
+    
+    
     
     Config_model_setup = SetupModelConfig()
     if os.path.isfile(extra_model_config):
@@ -80,6 +87,7 @@ if __name__ == "__main__":
                         train_params=config_train,
                         model_type=args.model_type,
                         user_dir=store_dir)
+    print("Model setup successful")
     Train.train()
     num_parameters = Train.model.num_parameters()
     print(Output.table_config(config_model, "model"))

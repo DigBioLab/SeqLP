@@ -60,4 +60,4 @@ max_length=150 # max length of sequences - will be padded to this
 
 script_filename="/zhome/20/8/175218/SeqLP/src/seqlp/__main__.py"
 
-python3  $script_filename --command_script_dir $command_script_dir --run_name $run_name --store_dir $store_dir --max_sequence_num $max_sequence_num --save_single_csv $save_single_csv --extra_model_config $extra_model_config --extra_train_config $extra_train_config --use_existing_data $use_existing_data --model_type $model_type --mlm_probability $mlm_probability --max_length $max_length
+/zhome/20/8/175218/SeqLP/.venv/bin/python3  $script_filename --command_script_dir $command_script_dir --run_name $run_name --store_dir $store_dir --max_sequence_num $max_sequence_num --save_single_csv $save_single_csv --extra_model_config $extra_model_config --extra_train_config $extra_train_config --use_existing_data $use_existing_data --model_type $model_type --mlm_probability $mlm_probability --max_length $max_length

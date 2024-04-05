@@ -1,8 +1,8 @@
 from transformers import Trainer, TrainingArguments
-from src.seqlp.setup.setup_model import SetupModel
+from .setup_model import SetupModel
 import os
-from src.seqlp.config.model_config import SetupModelConfig
-from src.seqlp.config.train_config import SetupTrainConfig
+from config.model_config import SetupModelConfig
+from config.train_config import SetupTrainConfig
 from torch.utils.data import Dataset
 
 class AminoAcidDataset(Dataset):
@@ -77,6 +77,8 @@ class TrainModel:
             # evaluation dataset
         )
         return trainer
+    
+        
 
     def train(self):
         self.trainer.train()

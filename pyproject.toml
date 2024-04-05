@@ -1,9 +1,10 @@
 [project]
 name = "SeqLP"
 version = "0.1.0"
-description = "You can use this package to train NLP models for sequences"
+description = "Default template for PDM package"
 authors = [
     {name = "Nils Hofmann", email = "nilhof01@gmail.com"},
+    {name = "nilshof01", email = "n.hofmann.99@web.de"},
 ]
 dependencies = [
     "torch>=2.2.2",
@@ -12,14 +13,9 @@ dependencies = [
     "requests>=2.31.0",
     "scikit-learn>=1.4.1.post1",
 ]
-requires-python = ">=3.11"
+requires-python = "==3.9.*"
 readme = "README.md"
 license = {text = "MIT"}
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
-
 [tool.pdm]
-distribution = true
+distribution = false

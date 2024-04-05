@@ -1,15 +1,15 @@
-from setup.train_model import TrainModel
-from setup.tokenizer import TokenizeData
+from src.seqlp.setup.train_model import TrainModel
+from src.seqlp.setup.tokenizer import TokenizeData
 
 
 ####INPUTS#####
-store_dir = "/zhome/20/8/175218/NLP_train/test_launch"
-command_script_dir = "/zhome/20/8/175218/NLP_train/"
+command_script_dir = r"C:\Users\nilsh\my_projects\SeqLP\data"
+store_dir = r"C:\Users\nilsh\my_projects\SeqLP\NLP_train"
 ###############
 tokenize = TokenizeData()
 
 filename = tokenize.download_and_prepare(download_commands_script=command_script_dir,
-                                    limit = 10,
+                                    limit = 10000,
                                     save_single_csvs = False,
                                     user_dir = store_dir)
 train_encodings, val_encodings = tokenize.tokenize(filename)

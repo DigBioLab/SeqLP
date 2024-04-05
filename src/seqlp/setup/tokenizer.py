@@ -14,13 +14,11 @@ class TokenizeData:
 
     @staticmethod
     def download_and_prepare(download_commands_script:str, limit = 1000000, save_single_csvs = False, user_dir = False, prep_data_type = "uniform") -> str:            
-        data_prep_type = {"uniform": "create_uniform_series_with_random_length",
-                        "fragment_directed": "create_uniform_series_chain_specific",}
+
     
         Prep = Prepare(download_commands_script, user_dir)
-        concatenated_df = Prep.download_data(limit = limit, save_single_csvs = save_single_csvs)
-        concatenated_df = getattr(Prep, data_prep_type[prep_data_type])(concatenated_df)
-        concatenated_df = Prep.drop_duplicates(concatenated_df)
+        concatenated_df:pd.Series = Prep.download_data(limit = limit, save_single_csvs = save_single_csvs, prep_data_type = prep_data_type)
+        concatenated_df:pd.Series = Prep.drop_duplicates(concatenated_df)
         filename = os.path.join(Prep.save_dir, "concatenated.csv")
         concatenated_df.to_csv(filename, index = False)
         with open(filename, 'rb') as f_in:
@@ -31,15 +29,14 @@ class TokenizeData:
     
     
     def tokenize(self, gz_filename:str, max_length = 150, mlm_probability = 0.15):
-        concatenated_df:pd.DataFrame = Prepare.read_gzipped_csv(gz_filename)
-        concatenated_df = Prepare.insert_space(concatenated_df)
+        concatenated_df = Prepare.read_gzipped_csv(gz_filename)
         train_sequences, val_sequences = Prepare.create_train_test(concatenated_df)
         
         model_checkpoint = "facebook/esm2_t6_8M_UR50D"
         self.tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-        train_encodings = self.tokenizer(train_sequences["sequences"].tolist(), truncation=True, padding='max_length', max_length=max_length, return_tensors="pt")
+        train_encodings = self.tokenizer(train_sequences.tolist(), truncation=True, padding='max_length', max_length=max_length, return_tensors="pt")
 
-        val_encodings = self.tokenizer(val_sequences["sequences"].tolist(), truncation=True, padding='max_length', max_length=max_length, return_tensors="pt")
+        val_encodings = self.tokenizer(val_sequences.tolist(), truncation=True, padding='max_length', max_length=max_length, return_tensors="pt")
 
         self.data_collator = self.masking(self.tokenizer, mlm_probability)
      #   val_labels = val_sequences["labels"].tolist()

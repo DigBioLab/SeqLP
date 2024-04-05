@@ -1,8 +1,7 @@
-from setup.tokenizer import TokenizeData
+from src.seqlp.setup.tokenizer import TokenizeData
 import json
 import os
-import argparse
-from setup.setup_model import SetupModel
+from src.seqlp.setup.setup_model import SetupModel
 
 class SetupModelConfig:
         

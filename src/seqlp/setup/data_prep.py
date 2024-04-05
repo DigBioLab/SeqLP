@@ -55,13 +55,13 @@ class ReadCSV:
    
    def __init__(self) -> None:
       self.cols_of_interest = ["fwr1_aa", "cdr1_aa", "fwr2_aa","cdr2_aa",  "fwr3_aa", "cdr3_aa", "fwr4_aa", "sequence_alignment_aa"]
-      self.concatenated_df = pd.DataFrame(columns = self.cols_of_interest)
+      self.concatenated_df = pd.Series(dtype='string[pyarrow]')
       self.csv_filename = ""
    
-   def unzip_and_read_csv(self, filename,):
+   def unzip_and_read_csv(self, filename,) -> pd.DataFrame:
 
       with gzip.open(filename, 'rt') as f:
-            aa_alignment_sequence = pd.read_csv(f, usecols = self.cols_of_interest, skiprows = 1)
+            aa_alignment_sequence = pd.read_csv(f, usecols = self.cols_of_interest, skiprows = 1, )
       return aa_alignment_sequence
    
    def get_sequence_num(self):
@@ -71,16 +71,7 @@ class ReadCSV:
    def concatenate(self, aa_alignment_sequence:pd.DataFrame):
       self.concatenated_df = pd.concat([self.concatenated_df, aa_alignment_sequence])
       
-   def process_csv(self, filename, aa_alignment_sequence = None, save_csvs = False):
-      if aa_alignment_sequence is not None:
-         pass
-      else:
-         aa_alignment_sequence = self.unzip_and_read_csv(filename)
-         
-      self.csv_filename = filename.split(".")[0] + ".csv"
-      self.concatenate(aa_alignment_sequence)
 
-      return aa_alignment_sequence
       
 
       
@@ -99,13 +90,22 @@ class Prepare:
       if not os.path.isdir(os.path.join(dir_main, "train_data")):
          os.mkdir(os.path.join(dir_main, "train_data"))
       return os.path.join(dir_main, "train_data")
-
-
-   def download_data(self, limit = 10, save_single_csvs = False) -> pd.DataFrame:
+   
+   @staticmethod
+   def input_check(prep_data_type, limit, sh_scripts):
+      assert len(sh_scripts) > 0, "No files found in the directory"
+      assert limit > 1, "The limit has to be greater than 1"
+      assert prep_data_type in ["uniform", "fragment_directed"], "The data preparation type is not valid. Please choose from uniform or fragment_directed"
+      
+      
+   def download_data(self, limit = 10, save_single_csvs = False, prep_data_type = "uniform") -> pd.Series:
       """Downloads the data in the file with the wget commands and filters the columns in the csvs and saves them again as gzipped csvs in self.save_dir.
       """
+      data_prep_type = {"uniform": "create_uniform_series_with_random_length",
+               "fragment_directed": "create_uniform_series_chain_specific",}
+      assert os.path.isdir(self.path_to_scripts), "The path to the scripts is not valid. Your path is: " + self.path_to_scripts + " and not a directory."
       sh_scripts = glob.glob(self.path_to_scripts + "/*.sh")
-      assert len(sh_scripts) > 0, "No files found in the directory"
+      self.input_check(prep_data_type, limit, sh_scripts)
       for sh_script in sh_scripts:
          with open(sh_script, "r") as f:
             for line in f:
@@ -119,9 +119,14 @@ class Prepare:
                   # Write the content of the response to a file
                   with open(save_name, 'wb') as out_file:
                      out_file.write(response.content)
-                  aa_alignment_sequence = self.CSVSaver.process_csv(save_name, save_csvs = save_single_csvs)
-                  self.CSVSaver.concatenate(aa_alignment_sequence)
-                  #os.remove(self.CSVSaver.csv_filename)
+                     
+                  aa_alignment_sequence = self.CSVSaver.unzip_and_read_csv(save_name)
+                  sequence_series = getattr(self, data_prep_type[prep_data_type])(aa_alignment_sequence)
+                  sequence_series = self.insert_space(sequence_series)
+
+                  self.CSVSaver.concatenate(sequence_series)
+                  os.remove(save_name)
+
 
                if self.CSVSaver.get_sequence_num() > limit:
                   break
@@ -160,7 +165,7 @@ class Prepare:
          sequence = ''.join(row[col] for col in valid_combination)
          sequences.append(sequence)
 
-      return pd.Series(sequences, name='sequences')
+      return pd.Series(sequences, name='sequences', dtype='string[pyarrow]')
    
    def create_uniform_series_with_random_length(self, concatenated_df: pd.DataFrame, minimum_length = 10) -> pd.Series:
       """This function just takes a random part of the full sequence if it is longer than 5, otherwise it takes the full sequence.
@@ -194,7 +199,7 @@ class Prepare:
          else:
                sequence = full_sequence
          sequences.append(sequence)
-      return pd.Series(sequences, name='sequences')
+      return pd.Series(sequences, name='sequences', dtype='string[pyarrow]')
       
    @staticmethod
    def drop_duplicates(concatenated_series:pd.Series) -> pd.Series:
@@ -206,23 +211,24 @@ class Prepare:
       return train_sequences, val_sequences
 
    @staticmethod
-   def insert_space(concatenated_df:pd.DataFrame) -> pd.DataFrame:
+   def insert_space(concatenated_df:pd.Series) -> pd.Series:
       """Inserts a space between the amino acids.
 
       Args:
-         concatenated_df (pd.DataFrame): _description_
+         concatenated_df (pd.sSeries): _description_
 
       Returns:
          pd.DataFrame: _description_
       """
       concatenated_df = concatenated_df.dropna()
-      assert 'sequences' in concatenated_df.columns, "columns are: " + concatenated_df.columns + " and not 'sequences'"
-      seqs = concatenated_df["sequences"].tolist()
-      concatenated_df['sequences'] = concatenated_df['sequences'].apply(lambda x: ' '.join(list(x)) if isinstance(x, str) else x)
+      seqs = concatenated_df.values.tolist()
+      assert isinstance(concatenated_df, pd.Series)
+      concatenated_df = concatenated_df.apply(lambda x: ' '.join(list(x)) if isinstance(x, str) else x)
       return concatenated_df
 
    @staticmethod
-   def read_gzipped_csv(filename):
+   def read_gzipped_csv(filename:str) -> pd.Series:
       with gzip.open(filename, 'rt') as f:
-         df = pd.read_csv(f)
-      return df
+         df = pd.read_csv(f, dtype='string[pyarrow]')
+      serie = df.iloc[:, 0]
+      return serie

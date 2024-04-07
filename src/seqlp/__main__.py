@@ -7,6 +7,7 @@ from setup.tokenizer import TokenizeData
 import argparse
 import os
 from output.create_output import GenerateOutput
+from output.memory_usage import print_gpu_utilization
 
 if __name__ == "__main__":
     ####ARGS####
@@ -18,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_single_csv", type=bool, default=False, help = "Save the single csvs")
     parser.add_argument("--extra_model_config", type=str, default="", help = "Extra model configuration. Has to be inputted as a dictionary")
     parser.add_argument("--extra_train_config", type=str, default="", help = "Extra training configuration. Has to be inputted as a dictionary")
-    parser.add_argument("--use_existing_data", type=str, default="", help = "Use existing data and skip downloading. If you enter a path to an existing file you can continue with that.")
+    parser.add_argument("--use_existing_data",nargs = "+", type=str, default=[], help = "Use existing data and skip downloading. If you enter a path to an existing file you can continue with that.")
     parser.add_argument("--model_type", type=str, default="distilBert", help = "Type of model to use")
     parser.add_argument("--mlm_probability", type=float, default=0.15, help = "Probability of masking a token")
     parser.add_argument("--max_length", type=int, default=150, help = "Maximum length of the sequences")
@@ -33,31 +34,39 @@ if __name__ == "__main__":
     run_name = args.run_name
     
     ####END ARGS####
-    Output = GenerateOutput(store_dir, run_name)
-
-
-
-    tokenize = TokenizeData()
-    print("Init Tokenizing")
-    if args.use_existing_data and store_dir is not None and not os.path.isfile(args.use_existing_data):
-        if args.use_existing_data:
-            print("You must provide the path to store_dir if you want to use existing data! Continue to download data.")
-        filename = tokenize.download_and_prepare(download_commands_script=command_script_dir,
-                                                limit = max_seq_num,
-                                                save_single_csvs = save_single_csv,
-                                                user_dir = store_dir,
-                                                prep_data_type="uniform")
+    if store_dir is not None:
+        os.mkdir(run_name)
+        store_dir = os.path.abspath(run_name)
     else:
-        if os.path.isfile(args.use_existing_data):
-            filename = args.use_existing_data
+        os.mkdir(os.path.join(store_dir, run_name))
+        store_dir = os.path.join(store_dir, run_name)
+        
+    Output = GenerateOutput(store_dir, run_name)
+    print_gpu_utilization()
+    tokenize = TokenizeData()
+    
+    if len(args.use_existing_data) ==0 and args.store_dir is not None:
+        print(f"Initialize Download from {command_script_dir}")
+        train_filename, val_filename = tokenize.download_and_prepare(download_commands_script=command_script_dir,
+                                                                     run_name=run_name,
+                                            limit = max_seq_num,
+                                            save_single_csvs = False,
+                                            user_dir = store_dir)
+    else:
+        if os.path.isfile(args.use_existing_data[0]) and os.path.isfile(args.use_existing_data[1]):
+            train_filename = args.use_existing_data[0]
+            val_filename = args.use_existing_data[1]
         else:
-            filename = os.path.join(store_dir,"train_data", "concatenated.csv.gz")
-            
-    train_encodings, val_encodings = tokenize.tokenize(filename, max_length=args.max_length, mlm_probability=args.mlm_probability)
+            FileExistsError("The files you provided do not exist. Please check the paths.")
+    print("Init Tokenizing")
+    train_encodings= tokenize.tokenize(train_filename)
+    print_gpu_utilization()
+    val_encodings = tokenize.tokenize(val_filename)
+    print_gpu_utilization()
+
     print("Data Collection and Tokenizing successful")
     
-    
-    
+    torch.cuda.empty_cache()
     Config_model_setup = SetupModelConfig()
     if os.path.isfile(extra_model_config):
         model_config_dict = Config_model_setup.read_json(extra_model_config)
@@ -73,13 +82,13 @@ if __name__ == "__main__":
     else:
         config_train = SetupTrainConfig().config
         print("Using default training configuration")
-
+    print_gpu_utilization()
 
     if torch.cuda.is_available():
+        print("CUDA is available. GPU support is enabled.")
         config_train["use_cpu"] = False
     else:
         config_train["use_cpu"] = True
-        
     Train = TrainModel(train_encodings,
                         val_encodings,
                         tokenize.data_collator,
@@ -87,6 +96,8 @@ if __name__ == "__main__":
                         train_params=config_train,
                         model_type=args.model_type,
                         user_dir=store_dir)
+    print_gpu_utilization()
+
     print("Model setup successful")
     Train.train()
     num_parameters = Train.model.num_parameters()

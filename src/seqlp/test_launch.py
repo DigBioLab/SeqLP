@@ -12,7 +12,8 @@ train_filename, val_filename = tokenize.download_and_prepare(download_commands_s
                                     limit = 10000,
                                     save_single_csvs = False,
                                     user_dir = store_dir)
-train_encodings, val_encodings = tokenize.tokenize(train_filename)
+train_encodings= tokenize.tokenize(train_filename)
+val_encodings = tokenize.tokenize(val_filename)
 
 heavy_config = {
     "num_hidden_layers": 3,

@@ -48,7 +48,7 @@
 store_dir="/zhome/20/8/175218/NLP_train/test_launch"
 run_name="test"
 command_script_dir="/zhome/20/8/175218/NLP_train"
-max_sequence_num=1000
+max_sequence_num=10000
 save_single_csv=False
 extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config.json"
 extra_train_config="/zhome/20/8/175218/NLP_train/serious_train/train_config.json"

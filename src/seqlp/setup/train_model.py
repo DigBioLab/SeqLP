@@ -4,6 +4,7 @@ import os
 from config.model_config import SetupModelConfig
 from config.train_config import SetupTrainConfig
 from torch.utils.data import Dataset
+import torch
 
 class AminoAcidDataset(Dataset):
     def __init__(self, encodings):
@@ -14,6 +15,7 @@ class AminoAcidDataset(Dataset):
 
     def __getitem__(self, idx):
         return {key: val[idx] for key, val in self.encodings.items()}
+
 
 
 
@@ -67,7 +69,6 @@ class TrainModel:
     def setup_trainer(self, train_encodings, val_encodings, data_collator):
         train_dataset = AminoAcidDataset(train_encodings)
         val_dataset = AminoAcidDataset(val_encodings)
-        print(train_dataset)
         trainer = Trainer(
             model=self.model,                         # the instantiated 🤗 Transformers model to be trained
             args=self.train_params,                  # training arguments, defined above

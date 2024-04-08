@@ -34,11 +34,14 @@ if __name__ == "__main__":
     run_name = args.run_name
     
     ####END ARGS####
-    if store_dir is not None:
+    if store_dir is None:
+        
         os.mkdir(run_name)
         store_dir = os.path.abspath(run_name)
     else:
-        os.mkdir(os.path.join(store_dir, run_name))
+        path = os.path.join(store_dir, run_name)
+        if os.path.isdir(path) == False:
+            os.mkdir(path)
         store_dir = os.path.join(store_dir, run_name)
         
     Output = GenerateOutput(store_dir, run_name)
@@ -58,7 +61,6 @@ if __name__ == "__main__":
             val_filename = args.use_existing_data[1]
         else:
             FileExistsError("The files you provided do not exist. Please check the paths.")
-    print("Init Tokenizing")
     train_encodings= tokenize.tokenize(train_filename)
     print_gpu_utilization()
     val_encodings = tokenize.tokenize(val_filename)
@@ -71,6 +73,7 @@ if __name__ == "__main__":
     if os.path.isfile(extra_model_config):
         model_config_dict = Config_model_setup.read_json(extra_model_config)
         config_model = Config_model_setup.get_config(tokenize,**model_config_dict)
+        print(config_model)
     else:
         Config_model_setup.set_tokenize_vocab(tokenize)
         Config_model_setup.set_max_len(args.max_length)
@@ -79,6 +82,7 @@ if __name__ == "__main__":
     if os.path.isfile(extra_train_config):
         train_config_dic = SetupTrainConfig.read_json(extra_train_config)
         config_train = SetupTrainConfig().get_config(**train_config_dic)
+        print(config_train)
     else:
         config_train = SetupTrainConfig().config
         print("Using default training configuration")

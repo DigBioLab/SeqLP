@@ -9,9 +9,9 @@
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 20:00
+#BSUB -W 23:59
 # request 5GB of system-memory
-#BSUB -R "rusage[mem=60GB]"
+#BSUB -R "rusage[mem=40GB]"
 ### -- set the email address --
 
 
@@ -45,12 +45,12 @@
 
 
 ####INPUTS#####
-run_name="buman_init"
+run_name="human_init_3_10^6"
 store_dir="/zhome/20/8/175218/NLP_train/serious_train"
 command_script_dir="/zhome/20/8/175218/NLP_train"
-max_sequence_num=5000000
+max_sequence_num=3000000
 save_single_csv=False
-extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config.json"
+extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config_distilbert.json"
 extra_train_config="/zhome/20/8/175218/NLP_train/serious_train/train_config.json"
 model_type="distilBert"
 

@@ -64,7 +64,7 @@ class TrainModel:
     
     def train_args(self, params:dict):
         params = self.add_dirs_to_train_args(params)
-        return TrainingArguments(**params)
+        return TrainingArguments( **params)
         
     def setup_trainer(self, train_encodings, val_encodings, data_collator):
         train_dataset = AminoAcidDataset(train_encodings)

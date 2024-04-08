@@ -17,6 +17,5 @@ class SetupTrainConfig:
     def get_config(self,**kwargs:dict) ->dict:
 
         for key, value in kwargs.items():
-            if key in self.config:
-                self.config[key] = value
+            self.config[key] = value
         return self.config

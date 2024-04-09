@@ -5,7 +5,7 @@
 ### -- set the job Name --
 #BSUB -J initial_run
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 1
+#BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
@@ -45,18 +45,19 @@
 
 
 ####INPUTS#####
-run_name="human_init_3_10^6"
-store_dir="/zhome/20/8/175218/NLP_train/serious_train"
+run_name="human_init_5_10^6"
+store_dir="/work3/s220672/NLP_train/serious_train"
 command_script_dir="/zhome/20/8/175218/NLP_train"
-max_sequence_num=3000000
+max_sequence_num=5000000
 save_single_csv=False
-extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config_distilbert.json"
+extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config_esm_t6.json"
 extra_train_config="/zhome/20/8/175218/NLP_train/serious_train/train_config.json"
-model_type="distilBert"
-
+model_type="esm"
+mlm_probability=0.15
+max_length=150 # max length of sequences - will be padded to this
 ###############
 
 
 script_filename="/zhome/20/8/175218/SeqLP/src/seqlp/__main__.py"
 
-/zhome/20/8/175218/SeqLP/.venv/bin/python3  $script_filename --command_script_dir $command_script_dir --run_name $run_name --store_dir $store_dir --max_sequence_num $max_sequence_num --save_single_csv $save_single_csv --extra_model_config $extra_model_config --extra_train_config $extra_train_config --model_type $model_type
+/zhome/20/8/175218/SeqLP/.venv/bin/python3  $script_filename --command_script_dir $command_script_dir --run_name $run_name --store_dir $store_dir --max_sequence_num $max_sequence_num --save_single_csv $save_single_csv --extra_model_config $extra_model_config --extra_train_config $extra_train_config --model_type $model_type --mlm_probability $mlm_probability --max_length $max_length

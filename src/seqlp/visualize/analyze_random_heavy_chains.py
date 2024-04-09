@@ -2,6 +2,8 @@ import glob
 import Bio.PDB
 import pandas as pd
 import rmsd
+import numpy as np 
+
 class MakeTable:
     def __init__(self, path_to_files) -> None:
         self.all_files = self.collect_files(path_to_files)
@@ -30,16 +32,16 @@ class MakeTable:
     def get_coordinates(self, pdb_file):
         parser = Bio.PDB.PDBParser(QUIET=True)
         structure = parser.get_structure('pdb', pdb_file)
-        for model in structure:
-            for chain in model:
-                for residue in chain:
-                    for atom in residue:
-                        return atom.get_coord()
+        ca_atoms = [atom for atom in structure.get_atoms() if atom.get_name() == 'CA']
+        coordinates = np.array([atom.coord for atom in ca_atoms])
+        return coordinates
                     
-    def calculate_rmsd():
-        target_coords_aligned = rmsd.kabsch(target_coords, ref_coords)
-    # Calculate the RMSD
-        rmsd_value = rmsd.rmsd(ref_coords, target_coords_aligned)
+    @staticmethod
+    def calculate_rmsd(target_coords, ref_coords):
+        """Calculate the RMSD between two sets of coordinates."""
+        rmsd_value = rmsd.kabsch_rmsd(target_coords, ref_coords)
+
+        return rmsd_value
 
     def process_files(self):
         data = []
@@ -47,9 +49,15 @@ class MakeTable:
             if self.is_single_chain(file):
                 try:
                     sequence = self.get_sequence(file)
+                    if file == self.all_files[0]:
+                        ref_coords = self.get_coordinates(file)
+                    else:
+                        pass
+                    
                     coordinates = self.get_coordinates(file)
                     filename = file.split('/')[-1].split(".")[0]      
-                    self.table = data.append({"filepath": file, "filename": filename, "sequence": sequence, "coordinates": coordinates})
+                    delta_rmsd = self.calculate_rmsd(coordinates, ref_coords)
+                    self.table = data.append({"filepath": file, "filename": filename, "sequence": sequence, "coordinates": coordinates, "delta_rmsd": delta_rmsd})
                 except:
                     print(f"No success with {file}")
         self.table = pd.DataFrame(data)
@@ -57,6 +65,7 @@ class MakeTable:
         
 
     
-Tabu = MakeTable(r"/zhome/20/8/175218/NLP_train/validation")
+Tabu = MakeTable(r"/zhome/20/8/175218/NLP_train/validation/H_Free_Martin")
 Tabu.process_files()
 print(Tabu.table.head())
+print(Tabu.table.shape)

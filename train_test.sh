@@ -5,7 +5,7 @@
 ### -- set the job Name --
 #BSUB -J initial_run
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 1
+#BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
@@ -45,15 +45,15 @@
 
 
 ####INPUTS#####
-store_dir="/zhome/20/8/175218/NLP_train/test_launch"
+store_dir="/work3/s220672/NLP_train/test_train"
 run_name="test"
 command_script_dir="/zhome/20/8/175218/NLP_train"
-max_sequence_num=10000
+max_sequence_num=1000
 save_single_csv=False
-extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config.json"
+extra_model_config="/zhome/20/8/175218/NLP_train/serious_train/model_config_esm_t6.json"
 extra_train_config="/zhome/20/8/175218/NLP_train/serious_train/train_config.json"
 use_existing_data=False
-model_type="distilBert"
+model_type="esm"
 mlm_probability=0.15
 max_length=150 # max length of sequences - will be padded to this
 ###############

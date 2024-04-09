@@ -111,7 +111,6 @@ if __name__ == "__main__":
     print(Output.collect_general_info(max_seq_num,
                                       time_dif,
                                       num_parameters,
-                                      args.command,
                                       args.model_type))
-    Train.trainer.save_model(os.path.join(store_dir, "model"))
+    Train.trainer.save_model(os.path.join(store_dir, "results"))
     print("Execution successful")

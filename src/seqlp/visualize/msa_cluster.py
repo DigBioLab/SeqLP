@@ -1,9 +1,19 @@
 from Bio import AlignIO
 from Bio import SeqIO
-from Bio.Align.Applications import MuscleCommandline
+import subprocess
 import editdistance
+import pandas as pd
+import os
 
-
+class Fasta:
+    def create_fasta(sequences:pd.Series, output_file = 'sequences.fasta'):
+        # Write the sequences to a FASTA file
+        with open(output_file, 'w') as file:
+            for index, sequence in sequences.items():
+                # Write the header with the sequence identifier
+                file.write(f'>{index}\n')
+                # Write the sequence, can wrap this with textwrap for specific line lengths
+                file.write(f'{sequence}\n')
 
 class MSACluster:
     @staticmethod
@@ -17,8 +27,11 @@ class MSACluster:
         return seq_records
     
     def run_msa(self,muscle_path, fasta_path, out = "aligned_sequences.fasta") -> list[str]:
-        cline = MuscleCommandline(muscle_path, input = fasta_path, out = out)
-        cline()
+        assert type(muscle_path) == str, "The muscle_path should be a string"
+        assert muscle_path.endswith(".exe"), "The muscle_path should end with .exe"
+        if not os.path.isfile(muscle_path):
+            raise FileNotFoundError(f"The muscle_path file {muscle_path} does not exist.")       
+        subprocess.run([muscle_path, "-in", fasta_path, "-out", out])
         alignment = AlignIO.read(out, 'fasta')
         sequence_strings = []
         for record in alignment:

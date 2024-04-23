@@ -1,4 +1,4 @@
-from src.seqlp.visualize.setup_model import SetupModel
+from seqlp.visualize.load_model import SetupModel
 
 
 def test_setup_model():

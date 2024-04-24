@@ -233,151 +233,41 @@ class PlotAttention:
         self.ax.set_yticklabels(list(sequence))  # Setting labels to letters
         self.ax.set_title(f"Mean Attention for top {no_heads_average}.")
 
-def calculate_cdr_positions(row):
-    # Concatenate all regions into one sequence
-    full_sequence = ''.join(row)
-    # Store the running length of the sequence to calculate positions
-    running_length = 0
-    # List to keep the position ranges of each CDR
-    cdr_positions = []
 
-    # Iterate over each region in the row
-    for key in row.index:
-        current_length = len(row[key])
-        if 'CDR' in key:  # Check if the region is a CDR
-            # Append the start and end positions to the list
-            cdr_positions.append((running_length, running_length + current_length - 1))
-        # Update running length after processing each region
-        running_length += current_length
-    
-    return full_sequence, cdr_positions
-
-
-class TransformData:
-    @staticmethod
-    def normalize_and_standardize(arr):
-        # Normalize the array to be non-negative
-        arr = arr - np.min(arr)
-        
-        # Standardize the array to sum to 1
-        total = np.sum(arr)
-        if total == 0:
-            raise ValueError("The sum of the array elements is zero, cannot divide by zero")
-        arr = arr / total
-        return arr
-
-    def hellinger_distance(p, q):
-        p = p.flatten()
-        q = q.flatten()
-        return (1 / np.sqrt(2)) * np.sqrt(np.sum((np.sqrt(p) - np.sqrt(q))**2))
-
-from msa_cluster import MSACluster, Fasta
-import pandas as pd
-from seqlp.visualize.load_model import SetupModel
-import numpy as np 
-
-
-class ComparativeAnalysis:
-    @staticmethod
-    def extract_from_csv(path = r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv", head_no = 30):
-        sequencing_report = pd.read_csv(path)
-        sequencing_report = sequencing_report.groupby("Experiment").head(head_no)
-        experiments = sequencing_report['Experiment'].tolist()
-        sequencing_report = sequencing_report[["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
-        sequencing_report[['full_sequence', 'CDRPositions']] = sequencing_report.apply(calculate_cdr_positions, axis=1, result_type='expand')
-        return experiments, sequencing_report
-
-    @staticmethod
-    def aling_to_each_other(sequencing_report, muscle_path = r"C:\Users\nilsh\my_projects\SeqLP\tests\test_data\nanobody_model"):
-        full_sequences = sequencing_report['full_sequence']
-        Fasta.create_fasta(full_sequences, "nanobody_sequences.fasta")
-        aligned_sequences = MSACluster().run_msa(muscle_path, "nanobody_sequences.fasta", "aligned_sequences.fasta")
-        seq_array = np.array([list(seq) for seq in aligned_sequences])
-        return seq_array
-    @staticmethod
-    def reformat_positions(position:list):
-        return [i for start, end in position for i in range(start, end + 1)]
-    
-    @staticmethod
-    def _get_top_attentions(sequence:str, all_positions:list, no_top_heads:int = 5):
-        attentions = Setup.get_attention(sequence = [sequence])
-        assert type(all_positions[0]) == int
-        Berto = Bertology(residues = all_positions, sequence = sequence, decision_function = "binding_site")
-        pa_f = Berto.compute_pa_f_fast(attentions)
-        heads_top_mean = AttentionAnalysis().calculate_top_head_one(pa_f, no_top_heads, attentions, method = "mean")
-        return heads_top_mean
-    
-    @staticmethod
-    def reformat_multi_sequence(sequence):
-        sequence = "".join(sequence.flatten().astype(str))
-        sequence = sequence.replace("-", "")
-        return sequence
-
-
-    def loop_sequences_and_align(self, seq_array, sequencing_report,muscle_path, normalization = True):
-        self.aling_to_each_other(sequencing_report, muscle_path=muscle_path)
-        collection_top_heads_mean = []
-        mask_array = (seq_array != '-').astype(int) # numpy array where dashes are 0. 
-        positions = sequencing_report['CDRPositions']
-        for sequence, position, row in zip(seq_array, positions, range(mask_array.shape[0])):
-            all_positions = self.reformat_positions(position)
-            sequence = self.reformat_multi_sequence(sequence)
-            mask_row = mask_array[row, :]
-            heads_top_mean = self._get_top_attentions(sequence, all_positions, no_top_heads = 5)
-            remove_i =0
-            remove_j = 0
-            final_matrix = np.zeros((mask_row.shape[0], mask_row.shape[0]))
-            for i in range(mask_row.shape[0]): # extend the heads matrix to the multiple sequence alignmnet length 
-                i_value = mask_row[i]
-                if i_value == 0:
-                    remove_i += 1
-                    continue
-                for j in range(mask_row.shape[0]):
-                    j_value = mask_row[j]
-                    if j_value == 1:
-                        value = heads_top_mean[i-remove_i, j - remove_j]
-                        final_matrix[i,j] = value
-                    else:
-                        remove_j += 1
-                remove_j = 0
-            if normalization == True:
-                pdf_weights = TransformData.normalize_and_standardize(final_matrix)
-            else:
-                pdf_weights = final_matrix
-            collection_top_heads_mean.append(pdf_weights)
-            return collection_top_heads_mean
-    
 
 # Generate a mask where each position is 0 if it's a dash, otherwise 1
 
-Setup = SetupModel(model_path = r"C:\Users\nilsh\my_projects\SeqLP\tests\test_data\nanobody_model")
+#comparative = collection_array[0, :, :] - collection_array[1, :, :]
+#plt.subplot(1, 3, 3)  # 1 row, 2 columns, second subplot
+#sns.heatmap(comparative, cmap='coolwarm')
+#plt.title('Comparative')
+#plt.show()
 
-collection_array = np.stack(collection_top_heads_mean, axis = 0)
-assert collection_array.shape[0] == full_sequences.shape[0], "The number of sequences should match the number of sequences in the collection array"
-import matplotlib
 
-matplotlib.use("QtAgg")
-first_array = collection_array[0, :, :]
-differences = []
-for i in range(collection_array.shape[0]):
-    diff = hellinger_distance(first_array, collection_array[i, :, :])
-    differences.append(diff)
+#import matplotlib
+
+#matplotlib.use("QtAgg")
+#first_array = collection_array[0, :, :]
+#differences = []
+#for i in range(collection_array.shape[0]):
+#    diff = hellinger_distance(first_array, collection_array[i, :, :])
+#    differences.append(diff)
 # Create a figure and an axis
-fig, ax = plt.subplots()
+#fig, ax = plt.subplots()
 
 # Plot each point and label it
-y_values = np.zeros_like(differences)
-df = pd.DataFrame({
-    'Differences': differences,
-    'Group': experiments
-})
-x_values = np.arange(len(differences))
-sns.stripplot(data=df, x=x_values, y="Differences", hue='Group', jitter=True, dodge=True, marker='o', palette='Set2')
-plt.legend(title='Experiment Groups')
-plt.title('Hellinger distance of attention distributions')
-plt.xlabel('sequence no.')  # Label the x-axis
-plt.tight_layout()
-plt.show()
+#y_values = np.zeros_like(differences)
+#df = pd.DataFrame({
+ #   'Differences': differences,
+  #  'Group': experiments
+#})
+#x_values = np.arange(len(differences))
+#sns.stripplot(data=df, x=x_values, y="Differences", hue='Group', jitter=True, dodge=True, marker='o', palette='Set2')
+#plt.legend(title='Experiment Groups')
+#plt.title('Hellinger distance of attention distributions')
+#plt.xlabel('sequence no.')  # Label the x-axis
+#plt.tight_layout()
+#plt.show()
 # Show the plot
     
 

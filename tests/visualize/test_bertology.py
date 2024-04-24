@@ -1,8 +1,6 @@
 
-
-
-from seqlp.visualize.load_model import SetupModel
-from seqlp.visualize.bertology import Bertology
+from src.seqlp.visualize.load_model import LoadModel
+from src.seqlp.visualize.bertology import Bertology
 import torch
 
 
@@ -12,7 +10,7 @@ def test_compute_pa_f_slow():
     positions_cdr2 = list(range(50,57))
     cdr3 = list(range(95,(95+23)))
     positions = positions_cdr1 + positions_cdr2 + cdr3
-    Setup = SetupModel(model_path = r"tests\test_data\nanobody_model")
+    Setup = LoadModel(model_path = r"tests\test_data\nanobody_model")
     attentions = Setup.get_attention(sequence = [cablacizumab])
     Berto = Bertology(residues = positions, sequence = cablacizumab, decision_function = "binding_site")
     pa_f = Berto.compute_pa_f_slow(attentions)
@@ -24,7 +22,7 @@ def test_compute_pa_f_fast():
     positions_cdr2 = list(range(50,57))
     cdr3 = list(range(95,(95+23)))
     positions = positions_cdr1 + positions_cdr2 + cdr3
-    Setup = SetupModel(model_path = r"tests\test_data\nanobody_model")
+    Setup = LoadModel(model_path = r"tests\test_data\nanobody_model")
     attentions = Setup.get_attention(sequence = [cablacizumab])
     Berto = Bertology(residues = positions, sequence = cablacizumab, decision_function = "binding_site")
     pa_f = Berto.compute_pa_f_fast(attentions)

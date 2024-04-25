@@ -13,8 +13,8 @@ class LoadModel:
             self.tokenizer = tokenizer
     
     def load_model(self, model_path:str):
-        assert os.path.isdir(model_path), "Your model path is not a directory. Please provide a directory with the model files. The files must be config.json, model.safetensors, training_args.bin"
-        assert os.path.isfile(os.path.join(model_path, "model.safetensors")), "Your model path does not contain a model.safetensors file. Please provide a directory with the model files. The files must be config.json, model.safetensors, training_args.bin"
+    #    assert os.path.isdir(model_path), "Your model path is not a directory. Please provide a directory with the model files. The files must be config.json, model.safetensors, training_args.bin"
+      #  assert os.path.isfile(os.path.join(model_path, "model.safetensors")), "Your model path does not contain a model.safetensors file. Please provide a directory with the model files. The files must be config.json, model.safetensors, training_args.bin"
         self.model = EsmModel.from_pretrained(model_path)
         self.tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t6_8M_UR50D")
     

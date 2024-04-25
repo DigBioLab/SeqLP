@@ -26,7 +26,7 @@ class TransformData:
 
 class ExtractData:
     @staticmethod
-    def calculate_cdr_positions(row):
+    def calculate_cdr_positions(row) -> (str, tuple):
         full_sequence = ''.join(row)
         running_length = 0
         cdr_positions = []
@@ -132,21 +132,33 @@ class ComparativeAnalysis:
             else:
                 pdf_weights = final_matrix
             collection_top_heads_mean.append(pdf_weights)
-            return collection_top_heads_mean
+        return collection_top_heads_mean
     
     
 
 
+class Pipeline:
+    def __init__(self, model_path:str):
+        self.Setup = LoadModel(model_path = model_path)
+        self.GetData = ExtractData()
+        self.Compare = ComparativeAnalysis()
+        
+    def run_pipeline(self, path_csv, number_sequences_per_group, muscle_path) -> np.array: # shape no_sequence x multi sequence alignment length x multi sequence laignment length    
+        sequencing_report = self.GetData.extract_from_csv(path_csv, head_no = number_sequences_per_group)
+        collection_top_heads_mean = self.Compare.loop_sequences_and_align(sequencing_report, muscle_path, self.Setup, normalization = True)
+        collection_array = np.stack(collection_top_heads_mean, axis = 0)
+        assert collection_array.shape[0] == sequencing_report.shape[0], "The number of sequences should match the number of sequences in the collection array"
+        return collection_array
     
-def run_pipeline(path_csv, number_sequences_per_group, muscle_path,  ) -> np.array: # shape no_sequence x multi sequence alignment length x multi sequence laignment length    
-    Setup = LoadModel(model_path = r"C:\Users\nilsh\my_projects\SeqLP\tests\test_data\nanobody_model")
-    GetData = ExtractData()
-    sequencing_report = GetData.extract_from_csv(path_csv, head_no = number_sequences_per_group)
-    Compare = ComparativeAnalysis()
-    collection_top_heads_mean = Compare.loop_sequences_and_align(sequencing_report, muscle_path, Setup, normalization = True)
-    collection_array = np.stack(collection_top_heads_mean, axis = 0)
-    assert collection_array.shape[0] == sequencing_report.shape[0], "The number of sequences should match the number of sequences in the collection array"
-    return collection_array
+    def single_sequence(self, clone):
+        full_sequence, cdr_positions = self.GetData.calculate_cdr_positions(clone)
+        all_positions = self.Compare.reformat_positions(cdr_positions)
+        heads_top_mean = self._get_top_attentions(self.Setup, full_sequence, all_positions, no_top_heads = 5)
+        normalized_array = TransformData.normalize_and_standardize(heads_top_mean)
+        return normalized_array
+            
+            
+
 
 
 

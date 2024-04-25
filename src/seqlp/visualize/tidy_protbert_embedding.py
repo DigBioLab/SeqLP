@@ -1,0 +1,221 @@
+import torch
+import re
+import pandas as pd
+# + pip install sentencepiece
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import numpy as np 
+import umap 
+from sklearn.cluster import DBSCAN
+from sklearn.utils import shuffle
+from transformers import AutoModel
+import os
+
+class TransformerBased:
+
+    def __init__(self, choice='Rostlab/prot_t5_xl_half_uniref50-enc', truncation = False, max_length = None, custom_model = False):
+        self.truncation = truncation
+        self.max_length = max_length
+        self.choice = choice
+        self.prep_model(custom_model)
+
+    def prep_model(self, custom_model):
+        if custom_model:
+            from transformers import AutoTokenizer, EsmModel
+            assert os.path.isdir(self.choice), "Your model path is not a directory. Please provide a directory with the model files. The files must be config.json, model.safetensors, training_args.bin"
+            self.tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t6_8M_UR50D")
+            self.model = EsmModel.from_pretrained(self.choice)
+            return
+        
+        model_types = ["facebook/esm2_t6_8M_UR50D", "Rostlab/ProstT5_fp16", "Rostlab/prot_t5_xl_uniref50", "Rostlab/prot_t5_base_mt_uniref50", "Rostlab/prot_bert_bfd_membrane", "Rostlab/prot_t5_xxl_uniref50",
+                       "Rostlab/ProstT5", "Rostlab/prot_t5_xl_half_uniref50-enc", "Rostlab/prot_bert_bfd_ss3", "Rostlab/prot_bert_bfd_localization",
+                       "Rostlab/prot_t5_xl_bfd", "Rostlab/prot_bert", "Rostlab/prot_xlnet", "Rostlab/prot_bert_bfd", "Rostlab/prot_t5_xxl_bfd"]
+        
+        t5 = ["Rostlab/ProstT5", "Rostlab/ProstT5_fp16", "Rostlab/prot_t5_xl_uniref50", "Rostlab/prot_t5_xxl_uniref50", "Rostlab/prot_t5_xl_half_uniref50-enc", "Rostlab/prot_t5_xl_bfd", "Rostlab/prot_t5_xxl_bfd"]
+        bertis = ["Rostlab/prot_bert_bfd_ss3", "Rostlab/prot_bert_bfd_localization", "Rostlab/prot_bert", "Rostlab/prot_xlnet", "Rostlab/prot_bert_bfd"]
+        esm = ["facebook/esm2_t6_8M_UR50D"]
+        assert self.choice in model_types, f"Your choice has to be a model from https://huggingface.co/Rostlab and has to be one of {model_types}"
+        if self.choice in t5:
+            from transformers import T5Tokenizer, T5EncoderModel
+            self.tokenizer = T5Tokenizer.from_pretrained(self.choice,
+                                                    do_lower_case=False,) ## Full transformer
+
+            self.model = T5EncoderModel.from_pretrained(self.choice, output_attentions = True )
+        elif self.choice in bertis:
+            from transformers import BertModel, BertTokenizer
+            self.tokenizer = BertTokenizer.from_pretrained(self.choice, do_lower_case=False) # encoder BERT architecture
+            self.model = BertModel.from_pretrained(self.choice, output_attentions = True )
+        elif self.choice in esm:
+            from transformers import AutoTokenizer, EsmModel
+            self.tokenizer = AutoTokenizer.from_pretrained(self.choice)
+            self.model = EsmModel.from_pretrained(self.choice)
+        
+
+    @staticmethod
+    def filter_sequences(sequencing_report:pd.DataFrame, batch_size:int, experiments:list,binding_data,
+                         region_of_interest = "aaSeqCDR3", cf_column_name = "cloneFraction", sample_column_name = "Experiment"):
+        
+        report_batch = sequencing_report.groupby(sample_column_name).head(batch_size)
+
+        
+        selected_rows = report_batch.loc[report_batch[sample_column_name].isin(experiments)]
+        selected_rows = shuffle(selected_rows) # dropping then more balanced between samples
+        selected_rows = selected_rows.drop_duplicates(subset=[region_of_interest], keep='first')
+        
+        assert selected_rows.shape[0] <= len(experiments) * batch_size
+        selected_rows = selected_rows.sort_values(by=[sample_column_name], ascending=True)
+        # this is to account for the dropped dups
+        max_clone_fraction = selected_rows.groupby(['Experiment', region_of_interest])['cloneFraction'].max() 
+        max_clone_fraction = max_clone_fraction.reset_index() # output: one col with Experiment, aaSeqCDR3 and clone fraction
+        # Merge back to original DataFrame to filter rows
+        result_df = selected_rows.merge(max_clone_fraction, on=[region_of_interest, 'Experiment'], suffixes=('', '_max'))
+
+        selected_rows = result_df[result_df['cloneFraction'] == result_df['cloneFraction_max']]
+
+        # Drop the additional column used for comparison
+ #       selected_rows.drop(columns=['cloneFraction_max'], inplace=True)
+
+        
+        assert selected_rows.shape[0] <= len(experiments) * batch_size
+        if binding_data is not None:
+            mix = selected_rows.merge(binding_data, on = region_of_interest, how = "outer")
+            selected_rows = mix.fillna(0)
+        max_fraction = max(selected_rows[cf_column_name])
+        selected_rows.loc[selected_rows[cf_column_name] == 0.0, cf_column_name] = max_fraction
+        selected_rows = selected_rows.sort_values(by=[sample_column_name], ascending=True)
+        sequences_filtered = selected_rows[region_of_interest]
+        sequences = [" ".join(list(re.sub(r"[UZOB*_]", "X", sequence))) for sequence in sequences_filtered]
+        for sample in experiments:  # tests
+            assert selected_rows[selected_rows["Experiment"] == sample].shape[0]<= batch_size, f"Number of sequences for {sample} is {umap_results[umap_results['experiments_string'] == sample].shape[0]} and should be smaller than {batch_size}"
+        return sequences,sequences_filtered, selected_rows
+        
+    def prepare_sequences(self,sequences, device = "cpu"):
+        ids = self.tokenizer.batch_encode_plus(sequences, add_special_tokens=True, truncation = True, max_length = 1430)
+        input_ids = torch.tensor(ids['input_ids'])
+        attention_mask = torch.tensor(ids['attention_mask'])
+        return attention_mask, input_ids
+    
+    def get_result(self, sequences:list):        
+        if not self.truncation:    
+            encoded_input = self.tokenizer(sequences, return_tensors='pt', padding=True)
+        else:
+            if self.max_length == None:
+                max_length = 1440
+            else:
+                max_length = self.max_length
+            encoded_input = self.tokenizer(sequences, return_tensors = "pt", truncation = True, max_length = max_length)
+        embedding_repr = self.model(**encoded_input)
+        
+        return embedding_repr
+    
+    
+    
+    def embedding_per_seq(self, sequences:list[list], normalize = False):
+        sequences_list = []
+        for seq in sequences:
+            embeddings = self.get_result(seq)
+            last_hidden_state = embeddings.last_hidden_state
+            
+            maximum_length = last_hidden_state.shape[1]
+           
+            avg_seq = np.squeeze(last_hidden_state, axis=0)
+            
+            avg_seq = last_hidden_state.mean(dim = 1) # take average for each feature from all amino acids
+            if normalize == True:
+                #avg_seq = (avg_seq - torch.min(avg_seq)) / (torch.max(avg_seq) - torch.min(avg_seq))
+                min_value = torch.min(avg_seq)
+                shifted_distribution = avg_seq - min_value
+                sum_shifted = torch.sum(shifted_distribution)
+                normalized_distribution = shifted_distribution / sum_shifted
+                avg_seq = normalized_distribution
+            sequences_list.append(avg_seq.cpu().detach().numpy()[0])
+        
+        sequences_list = np.array(sequences_list)
+        return sequences_list
+    
+    @staticmethod
+    def do_pca(sequences_list, pca_components):
+        """
+        output: X: principal components of the embedding which has the shape: x = batch_size, y = principal component
+        """
+      #  assert batch_size > pca_components, "Your batch size (Number of sequences) needs to be bigger than the pca components. Further you should decrease the pca components more, otherwise the dimension reduction does not make really sense."
+        # batch size, sequence length, features
+
+        # loop over each sequence and make two dimensional and take average for all amino acids: output size: (batch_size, 1024)
+       # sequences_list = self.embedding_per_seq(sequences)
+         # shape y = 1024, x = batch_size (No. sequences)
+        pca = PCA(n_components=pca_components)
+        pca.fit(sequences_list)
+        X = pca.transform(sequences_list)
+        
+        print("Explained variance after reducing to " + str(pca_components) + " dimensions:" + str(np.sum(pca.explained_variance_ratio_).tolist()))
+
+        return X
+    
+    @staticmethod
+    def do_tsne(X, perplexity, iterations_tsne):
+        """
+        input: vector with shape: x = n_samples and y: n_features
+        """
+        tsne = TSNE(n_components=2,
+            verbose=0,
+            perplexity=perplexity,
+            n_iter=iterations_tsne)
+        tsne_results = tsne.fit_transform(X)
+        tsne_results = pd.DataFrame(tsne_results,
+                                    columns = ["tsne1", "tsne2"])
+        return tsne_results
+    @staticmethod
+    def do_umap(X, n_neighbors = 15,min_dist = 0.2, random_seed = 42, densmap = True, n_components = 2, y = None, metric = "euclidian", number_jobs = -1, n_epochs = 1000):
+        """_summary_
+
+        Args:
+            X (array): an array with the PC's from PCA
+            n_neighbors (int): Larger values will result in more global structure being preserved at the loss of detailed local structure. In general this parameter should be between 5 to 50.
+            random_seed: Set a certrain seed for reproducing your results
+            densmap: This parameter allows you to visualize points more densily which are also more dense in all dimensions to each other. You can have an idea about this here: https://umap-learn.readthedocs.io/en/latest/densmap_demo.html
+
+        Returns:
+            pd.DataFrame: return a pandas dataframe with the two umap_dimensions
+        """
+        reducer = umap.UMAP(random_state = random_seed, n_neighbors = n_neighbors, 
+                            densmap = densmap, n_components = n_components,
+                            min_dist = min_dist, metric= metric, n_jobs = number_jobs,
+                            n_epochs=n_epochs)
+        if y == None or "color_samples":
+            reduced_dim = reducer.fit_transform(X)
+        else:
+            reduced_dim = reducer.fit_transform(X, y = y)
+        if reduced_dim.shape[1] == 2:
+            results = pd.DataFrame(reduced_dim, columns = ["UMAP_1", "UMAP_2"])
+        else: # for multidimensional UMAP
+            results = pd.DataFrame([])
+            for i in range(reduced_dim.shape[1]):
+                results["UMAP_" + str(i+1)] = reduced_dim[:,i]
+        return results, reduced_dim
+    
+    @staticmethod
+    def cluster_with_hdbscan(results, eps = 0.5, min_pts = 2):
+        """_summary_
+
+        Args:
+            results (pd.DataFrame): is the output from do_umap
+            eps (float, optional): Maximum distance between two points to still form one cluster. Defaults to 3.
+            min_pts (int, optional): fewest number of points required to form a cluster. Defaults to 4.
+
+        Returns:
+            _type_: _description_
+        """
+        arr = results.values
+        assert arr.shape[1]==2
+        get_clusters = DBSCAN(eps = eps, min_samples = min_pts).fit_predict(arr)
+        return get_clusters
+    
+    
+
+    
+#sequencing_report = pd.read_csv(r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv")
+#sequencing_report["cloneFraction"] = sequencing_report["readFraction"]
+#batch_size = 10
+#experiments = sequencing_report["Experiment"].unique().tolist()
+#TransformerBased.filter_sequences(sequencing_report, batch_size, experiments, None)

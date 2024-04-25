@@ -95,41 +95,46 @@ class Prepare:
    def input_check(prep_data_type, limit, sh_scripts):
       assert len(sh_scripts) > 0, "No files found in the directory"
       assert limit > 1, "The limit has to be greater than 1"
-      assert prep_data_type in ["uniform", "fragment_directed"], "The data preparation type is not valid. Please choose from uniform or fragment_directed"
       
       
-   def download_data(self, limit = 10, save_single_csvs = False, prep_data_type = "uniform") -> pd.Series:
+   def download_data(self, limit = 10, save_single_csvs = False, prep_data_type = "full_sequence") -> pd.Series:
       """Downloads the data in the file with the wget commands and filters the columns in the csvs and saves them again as gzipped csvs in self.save_dir.
       """
       data_prep_type = {"uniform": "create_uniform_series_with_random_length",
-               "fragment_directed": "create_uniform_series_chain_specific",}
+               "fragment_directed": "create_uniform_series_chain_specific",
+               "full_sequence": "create_series_full_nanobody"}
+      if prep_data_type not in data_prep_type.keys():
+         raise ValueError("The data preparation type is not valid. Please choose from uniform or fragment_directed")
       assert os.path.isdir(self.path_to_scripts), "The path to the scripts is not valid. Your path is: " + self.path_to_scripts + " and not a directory."
       sh_scripts = glob.glob(self.path_to_scripts + "/*.sh")
       self.input_check(prep_data_type, limit, sh_scripts)
       for sh_script in sh_scripts:
          with open(sh_script, "r") as f:
             for line in f:
-               if line.startswith('wget'):
-                  url = line.split(' ')[1].strip()
-                  name = os.path.basename(url).split(".")[0]
-                  save_name = os.path.join(self.save_dir, name)
-                  response = requests.get(url)
-                  # Make sure the request was successful
-                  response.raise_for_status()
-                  # Write the content of the response to a file
-                  with open(save_name, 'wb') as out_file:
-                     out_file.write(response.content)
-                     
-                  aa_alignment_sequence = self.CSVSaver.unzip_and_read_csv(save_name)
-                  sequence_series = getattr(self, data_prep_type[prep_data_type])(aa_alignment_sequence)
-                  sequence_series = self.insert_space(sequence_series)
+               try:
+                  if line.startswith('wget'):
+                     url = line.split(' ')[1].strip()
+                     name = os.path.basename(url).split(".")[0]
+                     save_name = os.path.join(self.save_dir, name)
+                     response = requests.get(url)
+                     # Make sure the request was successful
+                     response.raise_for_status()
+                     # Write the content of the response to a file
+                     with open(save_name, 'wb') as out_file:
+                        out_file.write(response.content)
+                        
+                     aa_alignment_sequence = self.CSVSaver.unzip_and_read_csv(save_name)
+                     sequence_series = getattr(self, data_prep_type[prep_data_type])(aa_alignment_sequence)
+                     sequence_series = self.insert_space(sequence_series)
 
-                  self.CSVSaver.concatenate(sequence_series)
-                  os.remove(save_name)
+                     self.CSVSaver.concatenate(sequence_series)
+                     os.remove(save_name)
 
 
-               if self.CSVSaver.get_sequence_num() > limit:
-                  break
+                  if self.CSVSaver.get_sequence_num() > limit:
+                     break
+               except:
+                  pass
       return self.CSVSaver.concatenated_df
 
    def create_uniform_series_chain_specific(self, concatenated_df: pd.DataFrame) -> pd.Series:
@@ -166,8 +171,21 @@ class Prepare:
          sequences.append(sequence)
 
       return pd.Series(sequences, name='sequences', dtype='string[pyarrow]')
+   @staticmethod
+   def create_series_full_nanobody(concatenated_df: pd.DataFrame) -> pd.Series:
+      """This function just takes the full sequence from the heavy chain.
+
+      Args:
+          concatenated_df (pd.DataFrame): contains the regions and full sequence in a dataframe
+
+      Returns:
+          pd.Series: one column with the full sequence from heavy chain.
+      """
+      sequences = concatenated_df['sequence_alignment_aa'].tolist()
+      return pd.Series(sequences, name='sequences', dtype='string[pyarrow]')
    
-   def create_uniform_series_with_random_length(self, concatenated_df: pd.DataFrame, minimum_length = 10) -> pd.Series:
+   @staticmethod
+   def create_uniform_series_with_random_length(concatenated_df: pd.DataFrame, minimum_length = 10) -> pd.Series:
       """This function just takes a random part of the full sequence if it is longer than 5, otherwise it takes the full sequence.
 
       Args:
@@ -232,3 +250,21 @@ class Prepare:
          df = pd.read_csv(f, dtype='string[pyarrow]')
       serie = df.iloc[:, 0]
       return serie
+   
+   
+   
+   
+   
+import os
+import pandas as pd
+
+
+#download_commands_script = r"/zhome/20/8/175218/SeqLP/tests/test_data"
+#if not os.path.isdir("/test_tmp"):
+ ##   os.mkdir("/test_tmp")
+#user_dir = "/zhome/20/8/175218/NLP_train/test_launch/test"
+#limit = 2
+#save_single_csvs = False
+#prep_data_type = "full_sequence"
+#Prep = Prepare(download_commands_script, user_dir)
+#concatenated_df:pd.Series = Prep.download_data(limit = limit, save_single_csvs = save_single_csvs, prep_data_type = prep_data_type)

@@ -1,9 +1,9 @@
 from sklearn.cluster import KMeans
-from load_model import LoadModel
+from .load_model import LoadModel
 import pandas as pd
 import numpy as np
 from sklearn.decomposition import PCA
-from comparative_analysis import ExtractData
+from .comparative_analysis import ExtractData
 # Assuming you have a pre-trained BERT model and tokenizer
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.ensemble import RandomForestClassifier
@@ -89,11 +89,6 @@ class Dense(nn.Module):
         layers.append(nn.Linear(sizes[-2], sizes[-1]))
         
         self.classifier = nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = x.float()
-        logits = self.classifier(x)
-        return F.softmax(logits, dim=1)
 
     def forward(self, x):
         x = x.float() 
@@ -182,7 +177,7 @@ class SupervisedML:
             raise ValueError("The number of samples in X and y should be equal")
         indices = self.shuffle_data(X)
         self.X = X[indices]
-        self.y_encoded = [y_encoded[i] for i in indices]
+        self.y_encoded = [y[i] for i in indices]
         self.cv = StratifiedKFold(n_splits=cv_components)
         
     @staticmethod
@@ -230,13 +225,13 @@ class SupervisedML:
             Train.iterate_through_epochs(model, TrainSets.trainloader, TrainSets.testloader, TrainSets.optimizer, TrainSets.loss_fn, num_epochs)
 
         
-#Data = DataPipeline(no_sequences = 10000000)
-#y = Data.init_sequencing_report['Experiment'].tolist()
-#y_encoded = [0 if item == "cLNTX_non-bind" else 1 for item in y]
-#ML = SupervisedML(Data.X, y_encoded, cv_components = 5)
-#model = ML.logistic_regression()
-#scores = ML.do_scikits_cv(model)
-#ML.do_nn_cv()
+Data = DataPipeline(no_sequences = 10000000)
+y = Data.init_sequencing_report['Experiment'].tolist()
+y_encoded = [0 if item == "cLNTX_non-bind" else 1 for item in y]
+ML = SupervisedML(Data.X, y_encoded, cv_components = 5)
+model = ML.logistic_regression()
+scores = ML.do_scikits_cv(model)
+ML.do_nn_cv()
 
     
 

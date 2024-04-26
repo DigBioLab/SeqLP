@@ -252,6 +252,23 @@ class Prepare:
       return serie
    
    
+#example: https://research.naturalantibody.com/nbdownload
+class FromTSV:
+
+   @staticmethod
+   def read_gzip_tsv(filename:str, limit) -> pd.Series:
+      """Returns the nanobody sequences in the first column. However, if you wish to do something with the cdr regions you need to write another method
+
+      Args:
+          filename (str): Name of File
+
+      Returns:
+          pd.Series: Series with one column containing the nanobody sequences.
+      """
+      with gzip.open(filename, 'rt') as f:
+         df = pd.read_csv(f, sep = "\t", dtype="string[pyarrow]", nrows = limit)
+      serie = df.iloc[:, 0]
+      return serie
    
    
    

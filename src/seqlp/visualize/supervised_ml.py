@@ -17,16 +17,20 @@ import torch.nn.functional as F
 
 class DataPipeline:
     def __init__(self, model = r"C:\Users\nilsh\my_projects\ExpoSeq\models\nanobody_model", pca = True, path_seq_report = r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv", pca_components = 10, no_sequences =10) -> None:
-        self.Setup = LoadModel(model_path = model)
+        if model != None:
+            self.Setup = LoadModel(model_path = model)
+        else:
+            self.Setup = None
         pca = pca
         self.init_sequencing_report = self._read_csv(path_seq_report, no_sequences)
-        full_sequences, experiments = self.wrangle_report(self.init_sequencing_report)
-        self.sequences_array = self._get_encodings(full_sequences)
-        if pca == True:
-            self.X = self.do_pca(self.sequences_array, pca_components)
-        else:
-            self.X = self.sequences_array
-            
+        self.full_sequences, experiments = self.wrangle_report(self.init_sequencing_report)
+        if self.Setup != None:
+            self.sequences_array = self._get_encodings(self.full_sequences)
+            if pca == True:
+                self.X = self.do_pca(self.sequences_array, pca_components)
+            else:
+                self.X = self.sequences_array
+                
     def _read_csv(self, path_seq_report, no_head = 100):
         csv = pd.read_csv(path_seq_report)  
         if "Experiment" in csv.columns:
@@ -225,13 +229,13 @@ class SupervisedML:
             Train.iterate_through_epochs(model, TrainSets.trainloader, TrainSets.testloader, TrainSets.optimizer, TrainSets.loss_fn, num_epochs)
 
         
-Data = DataPipeline(no_sequences = 10000000)
-y = Data.init_sequencing_report['Experiment'].tolist()
-y_encoded = [0 if item == "cLNTX_non-bind" else 1 for item in y]
-ML = SupervisedML(Data.X, y_encoded, cv_components = 5)
-model = ML.logistic_regression()
-scores = ML.do_scikits_cv(model)
-ML.do_nn_cv()
+#Data = DataPipeline(no_sequences = 10000000)
+#y = Data.init_sequencing_report['Experiment'].tolist()
+#y_encoded = [0 if item == "cLNTX_non-bind" else 1 for item in y]
+#ML = SupervisedML(Data.X, y_encoded, cv_components = 5)
+#model = ML.logistic_regression()
+#scores = ML.do_scikits_cv(model)
+#ML.do_nn_cv()
 
     
 

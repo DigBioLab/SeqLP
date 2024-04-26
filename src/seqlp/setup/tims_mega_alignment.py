@@ -1,4 +1,4 @@
-from data_prep import Prepare
+from data_prep import FromTSV
 import pandas as pd
 from Bio import AlignIO
 from Bio.Align import AlignInfo
@@ -8,9 +8,7 @@ import subprocess
 import editdistance
 import pandas as pd
 import os
-from Bio.motifs import Motif
-from Bio.Align import MultipleSeqAlignment
-from Bio.Align.AlignInfo import SummaryInfo
+
 class Fasta:
     def create_fasta(sequences:pd.Series, output_file = 'sequences.fasta'):
         # Write the sequences to a FASTA file
@@ -143,8 +141,7 @@ class MSACluster:
     
     
 muscle_path = r"C:\Users\nilsh\Downloads\muscle3.8.31_i86win32.exe"
-DataPrep = Prepare(r"C:\Users\nilsh\my_projects\SeqLP\data")
-sequence_series = DataPrep.download_data(limit = 2, save_single_csvs = False, prep_data_type = "full_sequence")
+sequences_series = FromTSV.read_gzip_tsv()
 print("You will align the following number of sequences:" + str(sequence_series.shape[0]))
 Fasta.create_fasta(sequence_series, "nanobody_sequences.fasta")
 aligned_sequences = MSACluster().run_msa(muscle_path, "nanobody_sequences.fasta", "aligned_sequences.fasta")

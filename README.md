@@ -51,6 +51,20 @@ python src.seqlp.__main__.py --command_script_dir <PATH_TO_SCRIPT_WITH_WGET_COMM
 ```
 
 The script will automatically download the data and start the training. Thus, it depends on a certain input structure where in each line of the script is one command starting with wget. You can download thos scripts from the [Observerd Antibody Space](https://opig.stats.ox.ac.uk/webapps/oas/) (OAS). As an example I filtered for heavy chains with human as species and received an overview of the data [here](https://opig.stats.ox.ac.uk/webapps/oas/oas_unpaired/). Click on the button here on the website and the script is automatically downloaded.
+Alternatively, you can train the model on nanobodies. The data can be downloaded from the [Nanobody Database](https://research.naturalantibody.com/nanobodies). If you want to use those you should prepare the data appropriately. You can download the file which is provided there under NGS sequences and use the methods which are implemented in this repository.
+
+```python
+from src.seqlp.setup.data_prep import FromTSV, Prepare
+
+sequence_series = FromTSV.read_tsv(filepath, limit = <LIMIT_NO_SEQUENCES>)
+sequence_series = Prepare.drop_duplicates(sequence_series)
+sequence_series = Prepare.insert_space(sequence_series) # very important otherwise the tokenizing will not work appropriately.
+train_sequences, val_sequences = Prepare.create_train_test(sequence_series)
+train_sequences.to_csv("train.csv", index = False)
+val_sequences.to_csv("val.csv", index = False)
+
+```
+
 
 ### Run the test script to check if the setup is working on your server
 

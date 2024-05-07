@@ -10,13 +10,15 @@ dependencies = [
     "pytest>=7.1.2",
     "requests>=2.31.0",
     "transformers>=4.39.3",
-    "pandas>=2.2.1",
-    "scikit-learn>=1.4.1.post1",
+    "pandas==1.4.1",
+    "scikit-learn>=1.7.3",
     "editdistance==0.6.2",
     "torch>=2.2.2",
     "biopython",
     "matplotlib",
-    "seaborn"
+    "seaborn",
+    "numpy==1.22.3",
+     "openblas==0.3.19"
 ]
 requires-python = "==3.11.*"
 readme = "README.md"

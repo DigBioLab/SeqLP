@@ -1,9 +1,8 @@
 from sklearn.cluster import KMeans
-from .load_model import LoadModel
+from load_model import LoadModel, DataPipeline
 import pandas as pd
 import numpy as np
-from sklearn.decomposition import PCA
-from .comparative_analysis import ExtractData
+
 # Assuming you have a pre-trained BERT model and tokenizer
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.ensemble import RandomForestClassifier
@@ -15,64 +14,13 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import KFold
 import torch.nn.functional as F
 
-class DataPipeline:
-    def __init__(self, model = r"C:\Users\nilsh\my_projects\ExpoSeq\models\nanobody_model", pca = True, path_seq_report = r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv", pca_components = 10, no_sequences =10) -> None:
-        if model != None:
-            self.Setup = LoadModel(model_path = model)
-        else:
-            self.Setup = None
-        pca = pca
-        self.init_sequencing_report = self._read_csv(path_seq_report, no_sequences)
-        self.full_sequences, experiments = self.wrangle_report(self.init_sequencing_report)
-        if self.Setup != None:
-            self.sequences_array = self._get_encodings(self.full_sequences)
-            if pca == True:
-                self.X = self.do_pca(self.sequences_array, pca_components)
-            else:
-                self.X = self.sequences_array
-                
-    def _read_csv(self, path_seq_report, no_head = 100):
-        csv = pd.read_csv(path_seq_report)  
-        if "Experiment" in csv.columns:
-            csv = csv.groupby("Experiment").head(no_head)
-        else:
-            csv = csv.head(100)
-        return csv
-        
-    @staticmethod
-    def wrangle_report(sequencing_report):
-        experiments = sequencing_report['Experiment'].tolist()
-        sequencing_report = sequencing_report[["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
-        sequencing_report[['full_sequence', 'CDRPositions']] = sequencing_report.apply(ExtractData.calculate_cdr_positions, axis=1, result_type='expand')
-        full_sequences = sequencing_report['full_sequence'].tolist()
-        return full_sequences, experiments
+
     
-    def _get_encodings(self, full_sequences):
-        sequences_list = []
-        for seq in full_sequences:
-            inputs = self.Setup._get_encodings([seq])
-            outputs = self.Setup.model(**inputs)
-            last_hidden_state = outputs.last_hidden_state
-
-            maximum_length = last_hidden_state.shape[1]
-
-            avg_seq = np.squeeze(last_hidden_state, axis=0)
-
-            avg_seq = last_hidden_state.mean(dim = 1) # take average for each feature from all amino acids
-            sequences_list.append(avg_seq.cpu().detach().numpy()[0])
-            
-        sequences_array = np.array(sequences_list)
-        return sequences_array
-    
-    @staticmethod
-    def do_pca(sequences_list, pca_components):
-        pca = PCA(n_components=pca_components)
-        pca.fit(sequences_list)
-        X = pca.transform(sequences_list)
-
-        print("Explained variance after reducing to " + str(pca_components) + " dimensions:" + str(np.sum(pca.explained_variance_ratio_).tolist()))
-        return X
-    
+#Data = DataPipeline(pca = False, no_sequences= 1000000)
+#final_data = Data.sequences_array
+#experiment_names = Data.init_sequencing_report["Experiment"]
+#np.savetxt("labels.txt", experiment_names, fmt='%s')
+#np.savetxt("embeddings.npy", final_data)
 
 
 class Dense(nn.Module):

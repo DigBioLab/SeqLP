@@ -6,13 +6,6 @@ This repository was created to easily train protein language models based on the
 
 First let's set up the directories to be able to store the output of the jobs in the appropriate folders. If you decide to use the exact same bash script for the jobs, as I did please create an email and set it in the script to receive the job notifications.
 
-```bash
-mkdir job_output
-mkdir job_error
-mkdir NLP_train
-mkdir NLP_train/serious_train
-mkdir NLP_train/test_train
-```
 
 ## Installation
 
@@ -32,6 +25,17 @@ pip install pdm
 pdm install 
 
 ```
+
+### Further dependencies
+
+cuda 11.8: https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Windows&target_arch=x86_64&target_version=11&target_type=exe_local
+
+ffmpeg 4.2.2: https://ffmpeg.org/
+
+cudnn 11.8: https://developer.nvidia.com/rdp/cudnn-archive
+
+gcc 8.4.0: https://gcc.gnu.org/gcc-8/
+
 
 ### Ask yourself: Where do I want to train the model?
 
@@ -66,8 +70,16 @@ val_sequences.to_csv("val.csv", index = False)
 ```
 
 
-### Run the test script to check if the setup is working on your server
+### Load the trained model
 
+```
+from src.seqlp.visualize.load_model import DataPipeline
+
+sequences = ["<SEQUENCE_1>", "<SEQUENCE_2>"] # No spaces between letters,here. Function does this automatically.
+Setup = LoadModel(<PATH_TO_MODEL>)
+embeddings = Setup._get_encodings(sequences)
+embeddings_array = embeddings.to_numpy()
+```
 
 
 

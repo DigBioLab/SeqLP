@@ -8,6 +8,9 @@ import argparse
 import os
 from output.create_output import GenerateOutput
 from output.memory_usage import print_gpu_utilization
+import os
+
+
 
 if __name__ == "__main__":
     ####ARGS####

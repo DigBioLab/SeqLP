@@ -1,73 +1,9 @@
 from .msa_cluster import MSACluster, Fasta
 import pandas as pd
-from .load_model import LoadModel
+from .load_model import LoadModel, ExtractData, TransformData
 import numpy as np 
 from .bertology import Bertology, AttentionAnalysis
 import os
-
-class TransformData:
-    @staticmethod
-    def normalize_and_standardize(arr:np.array) -> np.array:
-        max = np.max(arr)        
-        # Standardize the array to sum to 1
-        if max == 0:
-            normalized_array = arr  # or handle as needed, e.g., set to zero or leave unchanged
-        else:
-            # Normalize the array
-            normalized_array = arr / max
-        return normalized_array
-
-    def hellinger_distance(p, q):
-        p = p.flatten()
-        q = q.flatten()
-        return (1 / np.sqrt(2)) * np.sqrt(np.sum((np.sqrt(p) - np.sqrt(q))**2))
-
-
-
-class ExtractData:
-    @staticmethod
-    def calculate_cdr_positions(row) -> (str, tuple):
-        full_sequence = ''.join(row)
-        running_length = 0
-        cdr_positions = []
-
-        for key in row.index:
-            current_length = len(row[key])
-            if 'CDR' in key:  # Check if the region is a CDR
-
-                cdr_positions.append((running_length, running_length + current_length - 1))
-            running_length += current_length
-        
-        return full_sequence, cdr_positions
-    
-    def extract_full_sequence_from_regions(self, sequencing_report:pd.DataFrame) -> pd.DataFrame:
-        """Generates a full sequence in a separate column and gets the CDR positions which are necessary for constraining. 
-        Alignment of the sequences is necessary for the comparative analysis.
-
-        Args:
-            sequencing_report (pd.DataFrame): sequencing_report with aligned fragments
-
-        Returns:
-            pd.DataFrame: sequencing report with full sequence and cdr postions
-        """
-        if any(column not in sequencing_report.columns for column in ["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]):
-            raise ValueError("The columns should contain the regions of the nanobody")
-        sequencing_report = sequencing_report[["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
-        sequencing_report[['full_sequence', 'CDRPositions']] = sequencing_report.apply(self.calculate_cdr_positions, axis=1, result_type='expand')
-        return sequencing_report
-    
-    def extract_from_csv(self, path , head_no = 3):
-
-        assert path.endswith(".csv"), "The path should be a csv file"
-        sequencing_report = pd.read_csv(path)
-        if "Experient" in sequencing_report.columns:
-            sequencing_report = sequencing_report.groupby("Experiment").head(head_no)
-            experiments = sequencing_report['Experiment'].tolist()
-        else:
-            sequencing_report = sequencing_report.head(head_no)
-        sequencing_report = self.extract_full_sequence_from_regions(sequencing_report)
-        return sequencing_report
-
 
 
 

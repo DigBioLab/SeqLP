@@ -1,8 +1,10 @@
 import re
 import torch
 from transformers import AutoTokenizer, EsmModel, AutoModel
-import os
 import torch.nn.functional as F
+import pandas as pd
+from sklearn.decomposition import PCA
+import numpy as np 
 
 
 class LoadModel:
@@ -89,3 +91,125 @@ class LoadModel:
         return perplexity
         
     
+
+class TransformData:
+    @staticmethod
+    def normalize_and_standardize(arr:np.array) -> np.array:
+        max = np.max(arr)        
+        # Standardize the array to sum to 1
+        if max == 0:
+            normalized_array = arr  # or handle as needed, e.g., set to zero or leave unchanged
+        else:
+            # Normalize the array
+            normalized_array = arr / max
+        return normalized_array
+
+    def hellinger_distance(p, q):
+        p = p.flatten()
+        q = q.flatten()
+        return (1 / np.sqrt(2)) * np.sqrt(np.sum((np.sqrt(p) - np.sqrt(q))**2))
+
+
+
+class ExtractData:
+    @staticmethod
+    def calculate_cdr_positions(row) -> (str, tuple):
+        full_sequence = ''.join(row)
+        running_length = 0
+        cdr_positions = []
+
+        for key in row.index:
+            current_length = len(row[key])
+            if 'CDR' in key:  # Check if the region is a CDR
+
+                cdr_positions.append((running_length, running_length + current_length - 1))
+            running_length += current_length
+        
+        return full_sequence, cdr_positions
+    
+    def extract_full_sequence_from_regions(self, sequencing_report:pd.DataFrame) -> pd.DataFrame:
+        """Generates a full sequence in a separate column and gets the CDR positions which are necessary for constraining. 
+        Alignment of the sequences is necessary for the comparative analysis.
+
+        Args:
+            sequencing_report (pd.DataFrame): sequencing_report with aligned fragments
+
+        Returns:
+            pd.DataFrame: sequencing report with full sequence and cdr postions
+        """
+        if any(column not in sequencing_report.columns for column in ["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]):
+            raise ValueError("The columns should contain the regions of the nanobody")
+        sequencing_report = sequencing_report[["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
+        sequencing_report[['full_sequence', 'CDRPositions']] = sequencing_report.apply(self.calculate_cdr_positions, axis=1, result_type='expand')
+        return sequencing_report
+    
+    def extract_from_csv(self, path , head_no = 3):
+
+        assert path.endswith(".csv"), "The path should be a csv file"
+        sequencing_report = pd.read_csv(path)
+        if "Experient" in sequencing_report.columns:
+            sequencing_report = sequencing_report.groupby("Experiment").head(head_no)
+            experiments = sequencing_report['Experiment'].tolist()
+        else:
+            sequencing_report = sequencing_report.head(head_no)
+        sequencing_report = self.extract_full_sequence_from_regions(sequencing_report)
+        return sequencing_report
+
+
+class DataPipeline:
+    def __init__(self, model = r"C:\Users\nilsh\my_projects\ExpoSeq\models\nanobody_model", pca = True, path_seq_report = r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv", pca_components = 10, no_sequences =10) -> None:
+        if model != None:
+            self.Setup = LoadModel(model_path = model)
+        else:
+            self.Setup = None
+        pca = pca
+        self.init_sequencing_report = self._read_csv(path_seq_report, no_sequences)
+        self.full_sequences, experiments = self.wrangle_report(self.init_sequencing_report)
+        if self.Setup != None:
+            self.sequences_array = self._get_encodings(self.full_sequences)
+            if pca == True:
+                self.X = self.do_pca(self.sequences_array, pca_components)
+            else:
+                self.X = self.sequences_array
+                
+    def _read_csv(self, path_seq_report, no_head = 100):
+        csv = pd.read_csv(path_seq_report)  
+        if "Experiment" in csv.columns:
+            csv = csv.groupby("Experiment").head(no_head)
+        else:
+            csv = csv.head(100)
+        return csv
+        
+    @staticmethod
+    def wrangle_report(sequencing_report):
+        experiments = sequencing_report['Experiment'].tolist()
+        sequencing_report = sequencing_report[["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
+        sequencing_report[['full_sequence', 'CDRPositions']] = sequencing_report.apply(ExtractData.calculate_cdr_positions, axis=1, result_type='expand')
+        full_sequences = sequencing_report['full_sequence'].tolist()
+        return full_sequences, experiments
+    
+    def _get_encodings(self, full_sequences):
+        sequences_list = []
+        for seq in full_sequences:
+            inputs = self.Setup._get_encodings([seq])
+            outputs = self.Setup.model(**inputs)
+            last_hidden_state = outputs.last_hidden_state
+
+            maximum_length = last_hidden_state.shape[1]
+
+            avg_seq = np.squeeze(last_hidden_state, axis=0)
+
+            avg_seq = last_hidden_state.mean(dim = 1) # take average for each feature from all amino acids
+            sequences_list.append(avg_seq.cpu().detach().numpy()[0])
+            
+        sequences_array = np.array(sequences_list)
+        return sequences_array
+    
+    @staticmethod
+    def do_pca(sequences_list, pca_components):
+        pca = PCA(n_components=pca_components)
+        pca.fit(sequences_list)
+        X = pca.transform(sequences_list)
+
+        print("Explained variance after reducing to " + str(pca_components) + " dimensions:" + str(np.sum(pca.explained_variance_ratio_).tolist()))
+        return X

@@ -28,6 +28,24 @@ class LoadModel:
         sequences = [" ".join(list(re.sub(r"[UZOB*_]", "X", sequence))) for sequence in sequence]
         encoded_input = self.tokenizer(sequences, return_tensors='pt', padding=True)
         return encoded_input
+    
+    def _get_embeddings(self, full_sequences):
+        sequences_list = []
+        for seq in full_sequences:
+            inputs = self._get_encodings([seq])
+            outputs = self.model(**inputs)
+            last_hidden_state = outputs.last_hidden_state
+
+            maximum_length = last_hidden_state.shape[1]
+
+            avg_seq = np.squeeze(last_hidden_state, axis=0)
+
+            avg_seq = last_hidden_state.mean(dim = 1) # take average for each feature from all amino acids
+            sequences_list.append(avg_seq.cpu().detach().numpy()[0])
+            
+        sequences_array = np.array(sequences_list)
+        return sequences_array
+    
     def get_attention(self, sequence:list):
         """Returns attentions of the loaded model and removes the CLS and SEP tokens from those. It assumes that these are the first and last tokens in the sequence, respectively.
 
@@ -213,3 +231,5 @@ class DataPipeline:
 
         print("Explained variance after reducing to " + str(pca_components) + " dimensions:" + str(np.sum(pca.explained_variance_ratio_).tolist()))
         return X
+    
+    

@@ -72,13 +72,17 @@ val_sequences.to_csv("val.csv", index = False)
 
 ### Load the trained model
 
-```
+```python
 from src.seqlp.visualize.load_model import DataPipeline
 
 sequences = ["<SEQUENCE_1>", "<SEQUENCE_2>"] # No spaces between letters,here. Function does this automatically.
 Setup = LoadModel(<PATH_TO_MODEL>)
-embeddings = Setup._get_encodings(sequences)
-embeddings_array = embeddings.to_numpy()
+Setup._get_embeddings(sequences)
+```
+Perform a pca
+
+```
+
 ```
 
 

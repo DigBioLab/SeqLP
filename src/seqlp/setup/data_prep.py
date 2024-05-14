@@ -272,9 +272,6 @@ class FromTSV:
    
    
    
-import os
-import pandas as pd
-
 
 #download_commands_script = r"/zhome/20/8/175218/SeqLP/tests/test_data"
 #if not os.path.isdir("/test_tmp"):

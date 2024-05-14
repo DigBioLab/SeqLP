@@ -1,6 +1,6 @@
 import re
 import torch
-from transformers import AutoTokenizer, EsmModel, AutoModel
+from transformers import AutoTokenizer, EsmModel, AutoModel, EsmForMaskedLM
 import torch.nn.functional as F
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -8,24 +8,30 @@ import numpy as np
 
 
 class LoadModel:
-    def __init__(self, model_path:str, model = None, tokenizer = None):
+    def __init__(self, model_path:str, model = None, tokenizer = None, load_masked_lm = False):
         if model == None and tokenizer == None:
-            self.load_model(model_path)
+            self.load_model(model_path, load_masked_lm)
         else:
             self.model = model
             self.tokenizer = tokenizer
     
-    def load_model(self, model_path:str):
+    def load_model(self, model_path:str, load_masked_lm:bool):
     #    assert os.path.isdir(model_path), "Your model path is not a directory. Please provide a directory with the model files. The files must be config.json, model.safetensors, training_args.bin"
       #  assert os.path.isfile(os.path.join(model_path, "model.safetensors")), "Your model path does not contain a model.safetensors file. Please provide a directory with the model files. The files must be config.json, model.safetensors, training_args.bin"
-        self.model = AutoModel.from_pretrained(model_path)
+        if load_masked_lm == True:
+            self.model = EsmForMaskedLM.from_pretrained(model_path)
+        else:
+            self.model = AutoModel.from_pretrained(model_path)
+
         self.tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t6_8M_UR50D")
     
     def _get_encodings(self, sequence):
         assert type(sequence) == list, "The sequence must be a list of strings"
         assert len(sequence) > 0, "You need to provide at least one sequence"
-        assert type(sequence[0]) == str, "The sequence must be a string"        
-        sequences = [" ".join(list(re.sub(r"[UZOB*_]", "X", sequence))) for sequence in sequence]
+        assert type(sequence[0]) == str, "The sequence must be a string"
+        sequences = [" ".join(list(re.sub(r"[UZOB*_]", "X", seq))) for seq in sequence if not " " in seq]
+        if len(sequences) == 0:
+            sequences = sequence # case when there is already a space between all letters
         encoded_input = self.tokenizer(sequences, return_tensors='pt', padding=True)
         return encoded_input
     
@@ -46,6 +52,30 @@ class LoadModel:
         sequences_array = np.array(sequences_list)
         return sequences_array
     
+    
+    def _get_embeddings_parallel(self, full_sequences, batch_size=32):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(device)  # Move model to appropriate device
+
+        # Prepare to collect batch results
+        all_avg_seqs = []
+
+        # Process sequences in batches
+        for i in range(0, len(full_sequences), batch_size):
+            batch_sequences = full_sequences[i:i + batch_size]
+            inputs = self._get_encodings(batch_sequences)
+            inputs = {k: v.to(device) for k, v in inputs.items()}  # Move inputs to device
+
+            with torch.no_grad():  # Disable gradient computation for inference
+                outputs = self.model(**inputs)
+                last_hidden_state = outputs.last_hidden_state
+                avg_seq = last_hidden_state.mean(dim=1)
+                all_avg_seqs.append(avg_seq.cpu().detach().numpy())  # Move results back to CPU and convert to numpy
+
+        # Concatenate all batch results into a single numpy array
+        sequences_array = np.concatenate(all_avg_seqs, axis=0)
+        return sequences_array
+        
     def get_attention(self, sequence:list):
         """Returns attentions of the loaded model and removes the CLS and SEP tokens from those. It assumes that these are the first and last tokens in the sequence, respectively.
 
@@ -175,13 +205,13 @@ class ExtractData:
 
 
 class DataPipeline:
-    def __init__(self, model = r"C:\Users\nilsh\my_projects\ExpoSeq\models\nanobody_model", pca = True, path_seq_report = r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv", pca_components = 10, no_sequences =10) -> None:
+    def __init__(self, model = r"C:\Users\nilsh\my_projects\ExpoSeq\models\nanobody_model", pca = True, path_seq_report = r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv", pca_components = 10, no_sequences =10, choose_labels = None) -> None:
         if model != None:
             self.Setup = LoadModel(model_path = model)
         else:
             self.Setup = None
         pca = pca
-        self.init_sequencing_report = self._read_csv(path_seq_report, no_sequences)
+        self.init_sequencing_report = self._read_csv(path_seq_report, no_sequences, choose_labels)
         self.full_sequences, experiments = self.wrangle_report(self.init_sequencing_report)
         if self.Setup != None:
             self.sequences_array = self._get_encodings(self.full_sequences)
@@ -190,12 +220,14 @@ class DataPipeline:
             else:
                 self.X = self.sequences_array
                 
-    def _read_csv(self, path_seq_report, no_head = 100):
+    def _read_csv(self, path_seq_report, no_head = 100, choose_labels = None):
         csv = pd.read_csv(path_seq_report)  
         if "Experiment" in csv.columns:
             csv = csv.groupby("Experiment").head(no_head)
         else:
             csv = csv.head(100)
+        if choose_labels is not None:
+            csv = csv[csv["Experiment"].isin(choose_labels)]
         return csv
         
     @staticmethod
@@ -232,4 +264,7 @@ class DataPipeline:
         print("Explained variance after reducing to " + str(pca_components) + " dimensions:" + str(np.sum(pca.explained_variance_ratio_).tolist()))
         return X
     
+    
+
+
     

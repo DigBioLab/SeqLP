@@ -1,5 +1,5 @@
 from sklearn.cluster import KMeans
-from load_model import LoadModel, DataPipeline
+from seqlp.visualize.load_model import LoadModel, DataPipeline
 import pandas as pd
 import numpy as np
 
@@ -24,28 +24,24 @@ import torch.nn.functional as F
 
 
 class Dense(nn.Module):
-    def __init__(self, layer_sizes, no_pc_components=10, no_output_classes=2, chosen_activation_func = "GELU"):
+    def __init__(self, layer_sizes, no_pc_components=10, no_output_classes=2, chosen_activation_func="GELU"):
         super(Dense, self).__init__()
         
-        sizes = [no_pc_components] + layer_sizes + [1]
-        
+        sizes = [no_pc_components] + layer_sizes + [no_output_classes]
         activation_func = getattr(nn, chosen_activation_func)()
         
         layers = []
-        for i in range(1, len(sizes) - 1):
+        for i in range(1, len(sizes)):
             layers.append(nn.Linear(sizes[i-1], sizes[i]))
-            layers.append(nn.BatchNorm1d(sizes[i]))
-            layers.append(activation_func)
-            
-        
-        layers.append(nn.Linear(sizes[-2], sizes[-1]))
+            if i < len(sizes) - 1:  # Avoid adding activation function in the output layer
+                layers.append(nn.BatchNorm1d(sizes[i]))
+                layers.append(activation_func)
         
         self.classifier = nn.Sequential(*layers)
 
     def forward(self, x):
         x = x.float() 
         out = self.classifier(x)
-
         return out
 
 

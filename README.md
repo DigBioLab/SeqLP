@@ -77,12 +77,13 @@ from src.seqlp.visualize.load_model import DataPipeline
 
 sequences = ["<SEQUENCE_1>", "<SEQUENCE_2>"] # No spaces between letters,here. Function does this automatically.
 Setup = LoadModel(<PATH_TO_MODEL>)
-Setup._get_embeddings(sequences)
+embeddings = Setup._get_embeddings(sequences)
 ```
 Perform a pca
 
 ```
-
+from src.seqlp.visualize.load_model import DataPipeline
+DataPipeline.do_pca(embeddings, pca_components = 15)
 ```
 
 

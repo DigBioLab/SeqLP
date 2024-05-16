@@ -8,6 +8,8 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import torch
+import scipy.stats as stats
+
 from sklearn.metrics import (
     precision_score,
     recall_score,
@@ -135,6 +137,20 @@ class AnalyseModel:
     
     def embed_cluster_sequences(self, sequences:list, labels:list = None, color_gradient:list = None, 
                                 explained_variance_threshold = 0.9, n_neighbors = 15, min_dist = 0.1, alpha = 0.5, cmap = "viridis", legend_header = "Targets",title = ""):
+        """Creates a plot with the embeddings of the sequences as dots and if labels are provided, depending on the label n markers are introduced. Furthermore the dots are colored according to color gradient.
+
+        Args:
+            sequences (list): Amino acid sequences without spaces between the amino acid
+            labels (list, optional): List of labels for the sequences. Length must be equal to sequences. Defaults to None.
+            color_gradient (list, optional): _description_. Defaults to None.
+            explained_variance_threshold (float, optional): _description_. Defaults to 0.9.
+            n_neighbors (int, optional): _description_. Defaults to 15.
+            min_dist (float, optional): _description_. Defaults to 0.1.
+            alpha (float, optional): _description_. Defaults to 0.5.
+            cmap (str, optional): _description_. Defaults to "viridis".
+            legend_header (str, optional): _description_. Defaults to "Targets".
+            title (str, optional): _description_. Defaults to "".
+        """
         if labels is not None:
             assert len(labels) == len(sequences), "The length of the labels should be equal to the length of the sequences"
         if color_gradient is not None:
@@ -178,14 +194,37 @@ class AnalyseModel:
         X, no_components = self.do_pca(embedding_array, explained_variance_threshold)
         return no_components
         
-    def embed_cluster_label(self, sequences:list, labels:list = None,
-                                explained_variance_threshold = 0.9, n_components = None, n_neighbors = 15, min_dist = 0.1, alpha = 0.5, size_points = 15, cmap = "viridis", legend_header = "Targets",title = "", color_list = None):
+    def embed_cluster_label(self, sequences:list, labels:list = None, embeddings = None,
+                                explained_variance_threshold = 0.9,  n_components = None, n_neighbors = 15, min_dist = 0.1, alpha = 0.5, size_points = 15, cmap = "viridis", legend_header = "Targets",title = "", color_list = None):
+        """_summary_
+
+        Args:
+            sequences (list): Amino acid sequences without spaces between the amino acid
+            labels (list, optional): List of labels for the sequences. Length must be equal to sequences. Defaults to None.
+            embeddings (np.array, optional): If you provide those the algorithm will skip the use of the model and continues with the plot.
+            explained_variance_threshold (float, optional): If you provide this the algorithm will look for n pc components to reach this explained variance. Defaults to 0.9.
+            n_components (_type_, optional): If you provide this the algorithm will use that many components to pipe into UMAP. Defaults to None.
+            n_neighbors (int, optional): Number of neighbors for UMAP. Defaults to 15.
+            min_dist (float, optional): _description_. Defaults to 0.1.
+            alpha (float, optional): _description_. Defaults to 0.5.
+            size_points (int, optional): _description_. Defaults to 15.
+            cmap (str, optional): _description_. Defaults to "viridis".
+            legend_header (str, optional): _description_. Defaults to "Targets".
+            title (str, optional): _description_. Defaults to "".
+            color_list (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         if labels is not None:
             assert len(labels) == len(sequences), "The length of the labels should be equal to the length of the sequences"
 
         assert type(sequences) == list, "Please provide the sequences in a list format"
         assert type(sequences[0]) == str, "Please provide the sequences in a list of strings"
-        embedding_array = self._embed_sequences(sequences)
+        if embeddings is not None:
+            embedding_array = embeddings
+        else:
+            embedding_array = self._embed_sequences(sequences)
         if n_components is not None:
             X:np.array = self.pca_driven(n_components, embedding_array)
         else:
@@ -200,7 +239,9 @@ class AnalyseModel:
         cmap_string = cmap
         cmap = plt.get_cmap(cmap)
         if color_list == None:
-            color_list = [cmap(i / (len(unique_labels) - 1)) for i in range(len(unique_labels))]
+            color_list = [cmap(i / (len(unique_labels) - 1)) for i in range(len(unique_labels))] 
+            for color in color_list:
+                color[3] = alpha
 
         for index, unique_label in enumerate(unique_labels):
             
@@ -245,6 +286,15 @@ class AnalyseModel:
         
         
     def calculate_perplexity(self, sequences:list, pad_token_id = 1):
+        """Use this method to calculate the perplexity of your sequences. 
+
+        Args:
+            sequences (list): list of sequences. If they are shorter than max_length they will be padded.
+            pad_token_id (int, optional): The pad token id of the model you are using. You must look at the vocab for the tokenizer to get that. Defaults to 1.
+
+        Returns:
+            _type_: _description_
+        """
         ## calculation according to https://huggingface.co/docs/transformers/perplexity but without striding as this is not needed here
         encoded_input = self.ModelSets._get_encodings(sequences)
         encodings = encoded_input
@@ -289,4 +339,15 @@ class AnalyseModel:
         }
 
 
+    @staticmethod
+    def paired_t_test(model_A_accuracies, model_B_accuracies):
+        differences = [a - b for a, b in zip(model_A_accuracies, model_B_accuracies)]
 
+        t_statistic, p_value = stats.ttest_rel(model_A_accuracies, model_B_accuracies)
+
+        print(f"T-statistic: {t_statistic}, P-value: {p_value}")
+
+        if p_value < 0.05:
+            print("The performance difference is statistically significant.")
+        else:
+            print("The performance difference is not statistically significant.")

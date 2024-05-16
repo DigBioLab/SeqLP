@@ -11,7 +11,7 @@ dependencies = [
     "requests>=2.31.0",
     "transformers>=4.39.3",
     "pandas==1.4.1",
-    "scikit-learn>=1.7.3",
+    #"scikit-learn>=1.7.3",
     "editdistance==0.6.2",
     "torch>=2.2.2",
     "biopython",

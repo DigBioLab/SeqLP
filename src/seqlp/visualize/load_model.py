@@ -47,6 +47,7 @@ class LoadModel:
             avg_seq = np.squeeze(last_hidden_state, axis=0)
 
             avg_seq = last_hidden_state.mean(dim = 1) # take average for each feature from all amino acids
+            
             sequences_list.append(avg_seq.cpu().detach().numpy()[0])
             
         sequences_array = np.array(sequences_list)

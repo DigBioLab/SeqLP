@@ -238,11 +238,11 @@ class AnalyseModel:
         unique_labels = reduced_X["labels"].unique()
         cmap_string = cmap
         cmap = plt.get_cmap(cmap)
-        if color_list == None:
-            color_list = [cmap(i / (len(unique_labels) - 1)) for i in range(len(unique_labels))] 
-            for color in color_list:
-                color[3] = alpha
-
+        if color_list is None:
+            color_list = [cmap(i / (len(unique_labels) - 1)) for i in range(len(unique_labels))]
+        
+        color_list = [(r, g, b, alpha) for r, g, b, _ in color_list]
+        print(color_list)
         for index, unique_label in enumerate(unique_labels):
             
             localX = reduced_X[reduced_X["labels"] == unique_label]
@@ -299,7 +299,8 @@ class AnalyseModel:
         encoded_input = self.ModelSets._get_encodings(sequences)
         encodings = encoded_input
         labels = encodings["input_ids"].clone()
-        del encodings["token_type_ids"]
+        if "token_type_ids" in encodings:
+            del encodings["token_type_ids"]
         with torch.no_grad():
             outputs = self.ModelSets.model(**encodings, labels=labels)
         metrics=  self.compute_metrics(outputs.logits, labels, pad_token_id)

@@ -1,9 +1,13 @@
 import torch
 import matplotlib.pyplot as plt
 from numba import jit
-
 import numpy as np
-
+from Bio.PDB import PDBParser
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.PDB.Polypeptide import PPBuilder
+import matplotlib.cm as cm
+import matplotlib.colors as colors
 # property function f is often symmetric: which means that i,j and j,i return 1 or 0, respectively. 
 # The asymmetric case when i,j = 1 and j,i = 0 would happen if your attention is direction dependent. Direction should not be important for protein structures
 
@@ -136,6 +140,23 @@ class Bertology:
         pa_f = weighted_sum / sum_weights
 
         return pa_f
+    
+    def extract_sequence_from_pdb(pdb_file):
+        # Create a PDB parser object
+        parser = PDBParser(QUIET=True)
+        
+        # Parse the structure from the PDB file
+        structure = parser.get_structure('structure', pdb_file)
+        
+        # Create a polypeptide builder object
+        ppb = PPBuilder()
+        
+        # Extract the sequences
+        sequences = []
+        for pp in ppb.build_peptides(structure):
+            sequences.append(pp.get_sequence())
+        
+        return sequences
         
 import seaborn as sns
 
@@ -191,6 +212,8 @@ class PlotAttention:
         else: 
             self.ax = ax
         self.cmap = cmap
+        self.font_settings_title = {'fontfamily': 'serif', 'fontsize': '18', 'fontstyle': 'normal', 'fontweight': 'bold'}
+        self.font_settings_normal = {'fontfamily': 'serif', 'fontsize': '14', 'fontstyle': 'normal'}
 
     def create_fig(self, figure_no):
         self.fig = plt.figure(figure_no)
@@ -207,7 +230,7 @@ class PlotAttention:
 
 
     
-    def plot_residue_residue(self, sequence:str, attentions, no_heads_average = 5):
+    def plot_residue_residue_all(self, sequence:str, last_residue:int, attentions,residues:list[list] = None, no_heads_average = 5, ax = None):
         """This function creates a heatmap of the mean attention weights for the top n heads given the residue settings of pa_f.
 
         Args:
@@ -215,6 +238,8 @@ class PlotAttention:
             attentions (tensor): Tensor with shape [batch_size, layers, heads, max_seq_len, max_seq_len]. This contains the attention weights of the model.
             no_heads_average (int, optional): Here you choose how many of the top attention heads for the given constraints you would like to choose to calculate the average from. Defaults to 5.
         """
+        if ax == None:
+            ax = self.ax
         assert len(self.matrix.shape) == 3, "The input matrix should three dimensions. the first one is the batch size."
         assert type(sequence) == str, "The sequence should be a string"
         layers_head_tensor = self.matrix[0, :, :]
@@ -226,16 +251,72 @@ class PlotAttention:
         assert len(heads_top.shape) == 3, "The shape of the heads_top should be 3"
         assert heads_top.shape[0] == no_heads_average, "The number of heads should be the same as the no_heads_average"
         heads_top_mean = np.mean(heads_top, axis = 0) # you average over first dimension which is the number of heads
-        sns.heatmap(heads_top_mean, cmap = "Blues", ax = self.ax)
-        self.ax.set_xticks(np.arange(len(sequence)) + 0.5)  # Centering the labels
-        self.ax.set_xticklabels(list(sequence), rotation=90, ha='right')  # Setting labels to letters
-        self.ax.set_yticks(np.arange(len(sequence)) + 0.5)  # Centering the labels
-        self.ax.set_yticklabels(list(sequence))  # Setting labels to letters
-        self.ax.set_title(f"Mean Attention for top {no_heads_average}.")
+        sns.heatmap(heads_top_mean, cmap = self.cmap, ax = ax, cbar=None)
+        if residues != None:
+            colors_heatmap = ['#AEC6CF', '#77DD77', '#FFB7C5']
+            for cdr, color, label in zip(residues, colors_heatmap, ['CDR1', 'CDR2', 'CDR3']):
+                ax.hlines(y=-0.1, xmin=cdr[0], xmax=cdr[-1], color=color, linewidth=5)
+                ax.vlines(x=last_residue, ymin=cdr[0], ymax=cdr[-1], color=color, linewidth=5)
+                ax.text((cdr[0] + cdr[-1]) / 2, -3, label, color=color, ha='center', va='top')
+                ax.text(last_residue + 1, (cdr[0] + cdr[-1]) / 2, label, color=color, va='center', ha='left')
+
+            # Highlight CDR regions using axvspan and axhspan
+            for cdr, color in zip(residues, colors_heatmap):
+                ax.axvspan(cdr[0], cdr[-1], color=color, alpha=0.3)
+                ax.axhspan(cdr[0], cdr[-1], color=color, alpha=0.3)
+     #   self.ax.set_title(f"Mean Attention for top {no_heads_average}.")
+        return heads_top_mean
+     
+     
+    def create_region_specific_subplot(self, sequence:str, residues:list[list], last_residue:int, attentions, no_heads_average = 5,  title = "Average Attention over most suitable heads for the sequence", height_ratios = None):
+        plt.close()
+        no_regions = len(residues)
+        self.fig = plt.figure(figsize=(12, 8))
+        if residues is not None:
+            no_cols = 3
+            gs = self.fig.add_gridspec(no_cols, no_regions, width_ratios=[2, 1, 0.1], height_ratios=height_ratios, wspace=0.3, hspace=0.3)
+        else:
+            gs = self.fig.add_gridspec(no_cols, 3, width_ratios=[2, 1, 0.1], wspace=0.3)
+        left_main = self.fig.add_subplot(gs[:, 0])
+        heads_top_mean = self.plot_residue_residue_all(sequence, residues = residues, last_residue = last_residue, attentions = attentions, no_heads_average=no_heads_average, ax=left_main)
+        left_main.set_xlabel("Residue position", **self.font_settings_normal)
+        left_main.set_ylabel("Residue position", **self.font_settings_normal)
+        left_main.set_title("Attention for the entire sequence", pad = 20, **self.font_settings_normal)
+        global_min = np.min(heads_top_mean)
+        global_max = np.max(heads_top_mean)
+        n = 1
+        if residues is not None:
+            for no_region, region in enumerate(residues):
+                cur_ax = self.fig.add_subplot(gs[no_region, 1])
+                local_region = heads_top_mean[region[0]:region[-1], region[0]:region[-1]] 
+                xtick_positions = np.arange(len(local_region)) + 0.5
+                ytick_positions = np.arange(len(local_region)) + 0.5
+                sequence_region = sequence[region[0]:region[-1]]
+                sns.heatmap(local_region, cmap = self.cmap, ax = cur_ax, vmin=global_min, vmax=global_max, cbar = None)
+                cur_ax.set_xticks(xtick_positions)
+                cur_ax.set_xticklabels(sequence_region, ha = "center", fontsize = 7)       
+                cur_ax.set_yticks(ytick_positions)
+                cur_ax.set_yticklabels(sequence_region, va = "center", rotation = 0, fontsize = 7)   
+                cur_ax.set_title(f"Attention for CDR{n}", **self.font_settings_normal) 
+                n += 1
+        cur_ax.set_xlabel("Amino acids", **self.font_settings_normal)  
+        ax_colorbar = self.fig.add_subplot(gs[:, no_cols - 1])
+    
+        sm = cm.ScalarMappable(cmap=self.cmap, norm=colors.Normalize(vmin=global_min, vmax=global_max))
+        self.fig.suptitle(t = title, **self.font_settings_title)
+        cbar = plt.colorbar(sm, cax=ax_colorbar)
+        
+        cbar.set_label('Average Attention', **self.font_settings_normal)
+        cbar.ax.yaxis.label.set_rotation(270)
+        cbar.ax.yaxis.labelpad = 20 
+        sm.set_array([])
+        plt.tight_layout()
+            
+                
+        
+        
 
 
-
-# Generate a mask where each position is 0 if it's a dash, otherwise 1
 
 #comparative = collection_array[0, :, :] - collection_array[1, :, :]
 #plt.subplot(1, 3, 3)  # 1 row, 2 columns, second subplot

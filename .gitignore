@@ -173,3 +173,6 @@ server_venv
 
 *.csv
 *png
+*pdb
+Ab_interface_mapping
+prep_bind_data.ipynb

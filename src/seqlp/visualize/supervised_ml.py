@@ -77,13 +77,16 @@ class TrainNetwork:
         avg_loss = total_loss / num_batches
         accuracy = total_correct / size
         print(f"Validation: Avg loss: {avg_loss:.4f}, Accuracy: {accuracy:.4f}")
+        return accuracy
 
     def iterate_through_epochs(self, model, trainloader, testloader, optimizer, loss_fn, num_epochs = 5):
         for epoch in range(num_epochs):
             print(f"Epoch {epoch+1}")
             self.train_loop(trainloader, model, optimizer, loss_fn)
-            self.validate_loop(testloader, model, loss_fn)
+            accuracy = self.validate_loop(testloader, model, loss_fn)
             print("---------------------------------")
+        last_epoch_accuracy = accuracy
+        return last_epoch_accuracy
             
             
 class SetupTrain:
@@ -162,6 +165,7 @@ class SupervisedML:
             y_encoded = torch.tensor(self.y_encoded)
         else:
             y_encoded = self.y_encoded
+        accuracies = []
         for fold, (train_ids, test_ids) in enumerate(self.cv.split(X, y_encoded)):  # Ensure correct handling of indices
             print(f"FOLD {fold}")
             print("-------------------------------")
@@ -170,7 +174,10 @@ class SupervisedML:
             model = getattr(self, model_type)(**model_settings)
             TrainSets = SetupTrain(X, y_encoded, model,train_ids, test_ids, batch_size = batch_size, learning_rate = learning_rate)
             Train = TrainNetwork()
-            Train.iterate_through_epochs(model, TrainSets.trainloader, TrainSets.testloader, TrainSets.optimizer, TrainSets.loss_fn, num_epochs)
+            accuracies.append(Train.iterate_through_epochs(model, TrainSets.trainloader, TrainSets.testloader, TrainSets.optimizer, TrainSets.loss_fn, num_epochs))
+        avg_accuracy = sum(accuracies)/len(accuracies)
+        std_accuracy = np.std(np.array(accuracies))
+        return avg_accuracy, std_accuracy
 
         
 #Data = DataPipeline(no_sequences = 10000000)

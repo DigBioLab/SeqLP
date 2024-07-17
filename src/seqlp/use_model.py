@@ -84,7 +84,7 @@ class AnalyseModel:
                 legend_handle._sizes = [25]
                 legend_handle.set_color("black")
                 legend_handle.set_facecolor("black")
-        lgnd.set_title(title)
+       # lgnd.set_title(title)
         
         
     @staticmethod
@@ -195,7 +195,7 @@ class AnalyseModel:
         return no_components
         
     def embed_cluster_label(self, sequences:list, labels:list = None, embeddings = None,
-                                explained_variance_threshold = 0.9,  n_components = None, n_neighbors = 15, min_dist = 0.1, alpha = 0.5, size_points = 15, cmap = "viridis", legend_header = "Targets",title = "", color_list = None):
+                                explained_variance_threshold = 0.9,  n_components = None, n_neighbors = 15, min_dist = 0.1, alpha = 0.75, size_points = 15, cmap = "viridis", legend_header = "Targets",title = "", color_list = None):
         """_summary_
 
         Args:
@@ -258,7 +258,7 @@ class AnalyseModel:
     def save_in_plots(self, enter_filename):
         plt.savefig(
             fname=os.path.join( enter_filename + f".png"),
-            dpi=600,
+            dpi=300,
             format="png",
             bbox_inches="tight",
         )

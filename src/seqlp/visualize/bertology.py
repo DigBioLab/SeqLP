@@ -8,6 +8,8 @@ from Bio.SeqRecord import SeqRecord
 from Bio.PDB.Polypeptide import PPBuilder
 import matplotlib.cm as cm
 import matplotlib.colors as colors
+from iglabel import IMGT
+
 # property function f is often symmetric: which means that i,j and j,i return 1 or 0, respectively. 
 # The asymmetric case when i,j = 1 and j,i = 0 would happen if your attention is direction dependent. Direction should not be important for protein structures
 
@@ -267,8 +269,26 @@ class PlotAttention:
      #   self.ax.set_title(f"Mean Attention for top {no_heads_average}.")
         return heads_top_mean
      
+    @staticmethod
+    def get_labels(region_string:str, chosen_seq_length:int):
+        """Creates the IMGT labels for the chosen sequence length
+
+        Args:
+            region_string (str): _description_
+            chosen_seq_length (int): _description_
+
+        Returns:
+            list: A list with strings of either the IMGT labels or the position numbers
+        """
+        if region_string != "targetSequences":
+            region = [region_string.replace("aaSeq", "")]
+            label_dict, _ = IMGT([chosen_seq_length * "A"], region, save = False)
+            numbers_true = list(label_dict.values())[0]
+        else:
+            numbers_true = [str(i) for i in list(range(1, chosen_seq_length + 1))]
+        return numbers_true
      
-    def create_region_specific_subplot(self, sequence:str, residues:list[list], last_residue:int, attentions, no_heads_average = 5,  title = "Average Attention over most suitable heads for the sequence", height_ratios = None):
+    def create_region_specific_subplot(self, sequence:str, residues:list[list], last_residue:int, attentions, no_heads_average = 5,  title = "Average Attention over most suitable heads for the sequence", height_ratios = None, plot_imgt_labels = True):
         plt.close()
         no_regions = len(residues)
         self.fig = plt.figure(figsize=(12, 8))
@@ -285,6 +305,7 @@ class PlotAttention:
         global_min = np.min(heads_top_mean)
         global_max = np.max(heads_top_mean)
         n = 1
+        avail_regions = ["CDR1", "CDR2", "CDR3"]
         if residues is not None:
             for no_region, region in enumerate(residues):
                 cur_ax = self.fig.add_subplot(gs[no_region, 1])
@@ -293,10 +314,14 @@ class PlotAttention:
                 ytick_positions = np.arange(len(local_region)) + 0.5
                 sequence_region = sequence[region[0]:region[-1]]
                 sns.heatmap(local_region, cmap = self.cmap, ax = cur_ax, vmin=global_min, vmax=global_max, cbar = None)
+                if plot_imgt_labels:
+                    labels = self.get_labels(avail_regions[no_region], len(residues[no_region]) - 1)
+                else:
+                    labels = sequence_region
                 cur_ax.set_xticks(xtick_positions)
-                cur_ax.set_xticklabels(sequence_region, ha = "center", fontsize = 7)       
+                cur_ax.set_xticklabels(labels, ha = "center", fontsize = 7, rotation = 90)       
                 cur_ax.set_yticks(ytick_positions)
-                cur_ax.set_yticklabels(sequence_region, va = "center", rotation = 0, fontsize = 7)   
+                cur_ax.set_yticklabels(labels, va = "center", rotation = 0, fontsize = 7)   
                 cur_ax.set_title(f"Attention for CDR{n}", **self.font_settings_normal) 
                 n += 1
         cur_ax.set_xlabel("Amino acids", **self.font_settings_normal)  

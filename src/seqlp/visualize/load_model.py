@@ -139,6 +139,15 @@ class LoadModel:
         perplexity = torch.exp(loss / masked_indices[0].numel())
         return perplexity
         
+    @staticmethod
+    def do_pca(sequences_list, pca_components):
+        pca = PCA(n_components=pca_components)
+        pca.fit(sequences_list)
+        X = pca.transform(sequences_list)
+
+        print("Explained variance after reducing to " + str(pca_components) + " dimensions:" + str(np.sum(pca.explained_variance_ratio_).tolist()))
+        return X
+    
     
 
 class TransformData:
@@ -188,7 +197,7 @@ class ExtractData:
         """
         if any(column not in sequencing_report.columns for column in ["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]):
             raise ValueError("The columns should contain the regions of the nanobody")
-        sequencing_report = sequencing_report[["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
+        sequencing_report = sequencing_report[["aaSeqFR1", "aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
         sequencing_report[['full_sequence', 'CDRPositions']] = sequencing_report.apply(self.calculate_cdr_positions, axis=1, result_type='expand')
         return sequencing_report
     
@@ -206,13 +215,14 @@ class ExtractData:
 
 
 class DataPipeline:
-    def __init__(self, model = r"C:\Users\nilsh\my_projects\ExpoSeq\models\nanobody_model", pca = True, path_seq_report = r"C:\Users\nilsh\my_projects\ExpoSeq\my_experiments\max_new\sequencing_report.csv", pca_components = 10, no_sequences =10, choose_labels = None) -> None:
+    def __init__(self, model = r"nilsho01/LittleNano", pca = True, seq_report = r"", pca_components = 10, no_sequences =10, choose_labels = None) -> None:
         if model != None:
             self.Setup = LoadModel(model_path = model)
         else:
             self.Setup = None
         pca = pca
-        self.init_sequencing_report = self._read_csv(path_seq_report, no_sequences, choose_labels)
+        self.init_sequencing_report = self._read_csv(seq_report, no_sequences, choose_labels)
+        self.drop_not_covered_regions()
         self.full_sequences, experiments = self.wrangle_report(self.init_sequencing_report)
         if self.Setup != None:
             self.sequences_array = self._get_encodings(self.full_sequences)
@@ -222,6 +232,10 @@ class DataPipeline:
                 self.X = self.sequences_array
                 
     def _read_csv(self, path_seq_report, no_head = 100, choose_labels = None):
+        if isinstance(path_seq_report, pd.DataFrame):
+            return path_seq_report
+        else:
+            pass
         csv = pd.read_csv(path_seq_report)  
         if "Experiment" in csv.columns:
             csv = csv.groupby("Experiment").head(no_head)
@@ -231,10 +245,20 @@ class DataPipeline:
             csv = csv[csv["Experiment"].isin(choose_labels)]
         return csv
         
+    def drop_not_covered_regions(self):
+        regs = ["aaSeqFR1", "aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]
+        for reg in regs:
+            if reg not in self.init_sequencing_report.columns:
+                pass
+            else:
+                indexes_to_drop = self.init_sequencing_report[self.init_sequencing_report[reg] == 'region_not_covered'].index
+                self.init_sequencing_report = self.init_sequencing_report.drop(indexes_to_drop)
+        
+        
     @staticmethod
     def wrangle_report(sequencing_report):
         experiments = sequencing_report['Experiment'].tolist()
-        sequencing_report = sequencing_report[["aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
+        sequencing_report = sequencing_report[["aaSeqFR1", "aaSeqCDR1","aaSeqFR2","aaSeqCDR2","aaSeqFR3","aaSeqCDR3","aaSeqFR4"]]
         sequencing_report[['full_sequence', 'CDRPositions']] = sequencing_report.apply(ExtractData.calculate_cdr_positions, axis=1, result_type='expand')
         full_sequences = sequencing_report['full_sequence'].tolist()
         return full_sequences, experiments
